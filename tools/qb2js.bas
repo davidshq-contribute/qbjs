@@ -1531,20 +1531,40 @@ Function ConvertOpen$ (args As String, lineNumber As Integer)
     Dim As String filename, mode, handle
     argc = SLSplit(args, parts(), False)
 
+    ' The file name is an expression, so it can be several words: OPEN dir$ + "a.txt" FOR INPUT AS #1.
+    ' Find the FOR and the AS after it.
+    Dim As Integer forIdx, asIdx, i
+    forIdx = 0
+    asIdx = 0
+    For i = 2 To argc
+        If UCase$(parts(i)) = "FOR" Then
+            forIdx = i
+            Exit For
+        End If
+    Next i
+    If forIdx > 0 Then
+        For i = forIdx + 2 To argc
+            If UCase$(parts(i)) = "AS" Then
+                asIdx = i
+                Exit For
+            End If
+        Next i
+    End If
+
     ' The original form: OPEN "I", [#]handle, file [, record length]
-    If argc < 5 OrElse UCase$(parts(2)) <> "FOR" Then
+    If forIdx = 0 Then
         ConvertOpen = ConvertOpenOriginal(args, lineNumber)
         Exit Function
     End If
 
-    If UCase$(parts(4)) <> "AS" Then
+    If asIdx = 0 Or asIdx >= argc Or forIdx + 1 >= argc Then
         AddWarning lineNumber, "Syntax Error in Open statement"
         Exit Function
     End If
 
-    filename = String.Trim(ConvertExpression(parts(1), lineNumber))
-    mode = "QB." + UCase$(parts(3))
-    handle = String.Trim(ConvertExpression(String.Replace(parts(5), "#", ""), lineNumber))
+    filename = String.Trim(ConvertExpression(Join(parts(), 1, forIdx - 1, " "), lineNumber))
+    mode = "QB." + UCase$(parts(forIdx + 1))
+    handle = String.Trim(ConvertExpression(String.Replace(parts(asIdx + 1), "#", ""), lineNumber))
 
     ConvertOpen = filename + ", " + mode + ", " + handle
 End Function

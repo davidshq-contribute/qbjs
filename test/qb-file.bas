@@ -140,6 +140,29 @@ RmDir "test"
 Sub OpenFail: Open "../data.txt" For Input As #1: Close #1: End Sub
 UT.AssertError(@OpenFail, "File not found")
 
+' OPEN with a file name that is an expression of several words, and a variable as the file number
+Dim opDir As String, opLine As String, opNum As Integer
+opDir = "open-expr-"
+Open opDir + "a.txt" For Output As #1
+Print #1, "hello"
+Close #1
+Open opDir + "a" + ".txt" For Input As #1
+Line Input #1, opLine
+Close #1
+UT.AssertEquals opLine, "hello"
+opNum = 2
+Open "open-expr-" + LTrim$(Str$(opNum)) + ".txt" For Output As #opNum
+Print #opNum, "two"
+Close #opNum
+Open (opDir + "a.txt") For Input As #1
+Line Input #1, opLine
+Close #1
+UT.AssertEquals opLine, "hello"
+Open "open-expr-2.txt" For Input As #1
+Line Input #1, opLine
+Close #1
+UT.AssertEquals opLine, "two"
+
 ' INPUT # into an integer: QBJS cuts off the fraction; $ROUNDING EVEN rounds as QB does (3.5 to 4, 2.5 to 2)
 Dim inA%, inB%, inC&
 Open "test.txt" For Output As #1
