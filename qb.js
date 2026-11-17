@@ -358,12 +358,26 @@ var QB = new function() {
         _roundHalfEven = !!on;
     };
 
-    this.roundInt = function(value) {
+    // roundLong is for a LONG or a wider integer, roundInt for an INTEGER, a _BYTE or a _BIT. QB64 rounds a
+    // value for an integer of 16 bits or less as a single (798.50001 is 798.5, and 798), and for a wider
+    // one as the double it is (799), so with setRoundHalfEven(true) roundInt does the same.
+    this.roundLong = function(value) {
+        // a comparison gives a JavaScript boolean; QB's true is -1, so that NOT gives 0 for it
+        if (typeof value == "boolean") {
+            return value ? -1 : 0;
+        }
         var r = Math.round(value);
         if (_roundHalfEven && Math.abs(value % 1) === 0.5 && r % 2 !== 0) {
             r -= 1;
         }
         return r;
+    };
+
+    this.roundInt = function(value) {
+        if (_roundHalfEven && typeof value == "number") {
+            value = Math.fround(value);
+        }
+        return QB.roundLong(value);
     };
 
     this.toFloat = function(value) {

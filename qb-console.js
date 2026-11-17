@@ -304,6 +304,9 @@ function _QB() {
 
     // integer assignment and integer parameters: the compiler's own code only needs QBJS's default rounding
     function roundInt(value) {
+        if (typeof value == "boolean") {
+            return value ? -1 : 0;
+        }
         return Math.round(value);
     }
 
@@ -389,6 +392,7 @@ function _QB() {
         func__Round: func__Round,
         not: not,
         roundInt: roundInt,
+        roundLong: roundInt,
         func_Rnd: func_Rnd,
         func_RTrim: func_RTrim,
         func_Str: func_Str,

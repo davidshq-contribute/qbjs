@@ -1030,7 +1030,7 @@ Sub ConvertLines (firstLine As Integer, lastLine As Integer, functionName As Str
                     rightSide = String.Trim(Join(parts(), assignment + 1, -1, " "))
                     leftConverted = ConvertExpression(leftSide, i)
                     rightConverted = ConvertExpression(rightSide, i)
-                    If IsIntegerVar(leftSide) Then rightConverted = "QB.roundInt( " + rightConverted + " )"
+                    If IsIntegerVar(leftSide) Then rightConverted = RoundFunction(GetVarType(leftSide)) + "( " + rightConverted + " )"
                     js = RemoveSuffix(leftConverted) + " = " + rightConverted + ";"
                 Else
                     ' Check to see if there was no space left between the sub name and initial paren
@@ -1114,6 +1114,19 @@ Function IsIntegerVar (text As String)
        typeName = "LONG" Or typeName = "_UNSIGNED LONG" Or _
        typeName = "_INTEGER64" Or typeName = "_UNSIGNED _INTEGER64" Then
         IsIntegerVar = True
+    End If
+End Function
+
+' The runtime function that rounds a value for an integer of this type. With $ROUNDING EVEN, QB64 rounds
+' a value for an integer of 16 bits or less (as a single), and for a wider one (as a double) differently.
+Function RoundFunction$ (typeName As String)
+    typeName = UCase$(typeName)
+    If typeName = "_BIT" Or typeName = "_UNSIGNED _BIT" Or _
+       typeName = "_BYTE" Or typeName = "_UNSIGNED _BYTE" Or _
+       typeName = "INTEGER" Or typeName = "_UNSIGNED INTEGER" Then
+        RoundFunction = "QB.roundInt"
+    Else
+        RoundFunction = "QB.roundLong"
     End If
 End Function
 
@@ -3323,7 +3336,7 @@ Sub ConvertMethods ()
                             ' lookup the variable to get the jsname
                             Dim varIsArray As Integer
                             If FindVariable(bvar.name, bvar, varIsArray) Then
-                                intConv = intConv + bvar.jsname + " = QB.roundInt(" + bvar.jsname + "); "
+                                intConv = intConv + bvar.jsname + " = " + RoundFunction(typeName) + "(" + bvar.jsname + "); "
                             End If
 
                         ElseIf typeName = "FUNCTION" Or typeName = "SUB" Then

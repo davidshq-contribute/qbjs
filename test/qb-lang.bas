@@ -105,6 +105,17 @@ UT.AssertEquals rndB&, 6
 UT.AssertEquals rndHalf(2.5), 2
 UT.AssertEquals rndHalf(3.5), 4
 UT.AssertEquals rndHalf(1.4), 1
+' QB64 rounds a value for an INTEGER as a single, so 798.50001 is 798.5 and gives 798; for a LONG it
+' rounds the double, which gives 799. 798.5001 is above the half for both.
+Dim rndD As Double
+rndD = 798.50001
+rndA% = rndD
+UT.AssertEquals rndA%, 798
+rndB& = rndD
+UT.AssertEquals rndB&, 799
+rndD = 798.5001
+rndA% = rndD
+UT.AssertEquals rndA%, 799
 $ROUNDING UP
 UT.AssertEquals rndHalf(2.5), 3
 rndA% = 2.5
@@ -141,11 +152,29 @@ UT.AssertEquals pp, 10
 UT.AssertEquals bAddOne(1.4), 1
 UT.AssertEquals dtTwice(2.6), 5.2
 
+' a comparison stored in an integer is -1 for true and 0 for false, so NOT of it is 0 and -1 (not -2 and -1)
+Dim cmpInt As Integer, cmpLng As Long
+cmpInt = 3 > 2
+UT.AssertEquals cmpInt, -1
+cmpInt = 3 < 2
+UT.AssertEquals cmpInt, 0
+cmpLng = (3 > 2)
+UT.AssertEquals cmpLng, -1
+UT.AssertEquals bPositive(5), -1
+UT.AssertEquals bPositive(-5), 0
+UT.AssertEquals Not bPositive(5), 0
+UT.AssertEquals Not bPositive(-5), -1
+UT.AssertTrue (Not bPositive(-5) Or bPositive(-5))
+
 Console.Echo "QB Language - tests completed with no errors* in " + (Sys.TimeInMillis - ts) + " millisecond(s)"
 
 Sub OffBump (n As Integer)
     n = n + 1
 End Sub
+
+Function bPositive% (n As Integer)
+    bPositive = n > 0
+End Function
 
 Function rndHalf (n As Integer)
     rndHalf = n
