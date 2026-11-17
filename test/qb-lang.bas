@@ -38,4 +38,18 @@ UT.AssertEquals 100000&, 100000
 UT.AssertEquals 3.5!, 3.5
 UT.AssertEquals 42%, 42
 
+' DEF SEG, PEEK and POKE: a memory of bytes, empty at the start, values taken AND 255
+Def Seg = 0
+UT.AssertEquals Peek(100), 0
+Poke 100, 65
+UT.AssertEquals Peek(100), 65
+Poke 101, 300
+UT.AssertEquals Peek(101), 44
+Def Seg = &H40
+UT.AssertEquals Peek(100), 0
+Poke 100, 7
+UT.AssertEquals Peek(100), 7
+Def Seg
+UT.AssertEquals Peek(100), 65
+
 Console.Echo "QB Language - tests completed with no errors* in " + (Sys.TimeInMillis - ts) + " millisecond(s)"

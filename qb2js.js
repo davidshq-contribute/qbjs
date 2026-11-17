@@ -1767,6 +1767,9 @@ if (QB.halted()) { return; }; firstLine = Math.round(firstLine); lastLine = Math
                      if ((QB.func_UCase( QB.arrayValue(parts, [ 1]).value))  ==  "MID$" ) {
                         break ___l7811670;
                      }
+                     if ((QB.func_UCase( QB.arrayValue(parts, [ 1]).value))  ==  "DEF"  && (QB.func_UCase( QB.arrayValue(parts, [ j -  1]).value))  ==  "SEG" ) {
+                        break ___l7811670;
+                     }
                   }
                   assignment = Math.round(  j );
                   break ___l7811670;
@@ -2055,7 +2058,7 @@ if (QB.halted()) { return; }; lineNumber = Math.round(lineNumber);
 var ConvertSub = null;
 /* implicit variables: */ 
    var js = '';  /* STRING */ 
-   if ( m.name ==  "Line"  |  m.name ==  "_Clipboard$"  |  m.name ==  "_ClipboardImage" ) {
+   if ( m.name ==  "Line"  |  m.name ==  "_Clipboard$"  |  m.name ==  "_ClipboardImage"  |  m.name ==  "Def" ) {
       var parts = QB.initArray([{l:0,u: 0}], '');  /* STRING */ 
       var plen = 0;  /* INTEGER */ 
       plen = Math.round( (await func_SLSplit(  args,   parts ,    False)) );
@@ -2065,6 +2068,17 @@ var ConvertSub = null;
             m.jsname = "QB.sub_LineInput";
             args = (await func_Join( parts ,    2,    - 1,   " "));
             m.sync = Math.round(  True );
+         } else if ( m.name ==  "Def" ) {
+            if ((QB.func_UCase( QB.arrayValue(parts, [ 1]).value))  ==  "SEG" ) {
+               m.jsname = "QB.sub_DefSeg";
+               if ( plen > 1 && QB.arrayValue(parts, [ 2]).value  ==  "=" ) {
+                  args = (await func_Join( parts ,    3,    - 1,   " "));
+               } else {
+                  args = "";
+               }
+            } else {
+               await sub_AddWarning(  lineNumber,   "Unsupported DEF statement");
+            }
          } else if (QB.arrayValue(parts, [ 1]).value  ==  "=" ) {
             ___v27859: { var ___v1910613 =  m.name; 
                if (___v1910613 == "_Clipboard$") {___v5187230: { 
@@ -5660,6 +5674,9 @@ if (QB.halted()) { return; };
    await sub_AddQBMethod( "FUNCTION" ,   "Asc" ,    False);
    await sub_AddQBMethod( "FUNCTION" ,   "Atn" ,    False);
    await sub_AddQBMethod( "SUB" ,   "Beep" ,    False);
+   await sub_AddQBMethod( "SUB" ,   "Def" ,    False);
+   await sub_AddQBMethod( "FUNCTION" ,   "Peek" ,    False);
+   await sub_AddQBMethod( "SUB" ,   "Poke" ,    False);
    await sub_AddQBMethod( "FUNCTION" ,   "Chr$" ,    False);
    await sub_AddQBMethod( "FUNCTION" ,   "Cdbl" ,    False);
    await sub_AddQBMethod( "SUB" ,   "ChDir" ,    False);

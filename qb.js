@@ -1591,6 +1591,28 @@ var QB = new function() {
         return Math.atan(value);
     };
 
+    // DEF SEG, PEEK and POKE work on a small memory of bytes, keyed by segment * 16 + address. It is empty
+    // at the start, so a PEEK of an address that was not POKEd gives 0. Nothing of DOS's memory map
+    // (the keyboard flags at &H40:&H17, the screen buffer at &HB800) is emulated.
+    var _defSeg = 0;
+    var _peekPokeMemory = {};
+
+    this.sub_DefSeg = function(segment) {
+        _defSeg = (segment == undefined) ? 0 : (Math.round(_assertNumber(segment)) & 0xFFFF);
+    };
+
+    this.func_Peek = function(address) {
+        address = Math.round(_assertNumber(address));
+        var value = _peekPokeMemory[_defSeg * 16 + (address & 0xFFFF)];
+        return value == undefined ? 0 : value;
+    };
+
+    this.sub_Poke = function(address, value) {
+        address = Math.round(_assertNumber(address));
+        value = Math.round(_assertNumber(value));
+        _peekPokeMemory[_defSeg * 16 + (address & 0xFFFF)] = value & 255;
+    };
+
     this.sub_Beep = function() {
         var oscillator = _soundCtx.createOscillator();
         oscillator.type = "square";

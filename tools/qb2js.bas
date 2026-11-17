@@ -939,6 +939,7 @@ Sub ConvertLines (firstLine As Integer, lastLine As Integer, functionName As Str
                             If UCase$(parts(j - 1)) = "_CLIPBOARD$" Then Exit For
                             If UCase$(parts(j - 1)) = "_CLIPBOARDIMAGE" Then Exit For
                             If UCase$(parts(1)) = "MID$" Then Exit For
+                            If UCase$(parts(1)) = "DEF" AndAlso UCase$(parts(j - 1)) = "SEG" Then Exit For
                         End If
 
                         assignment = j
@@ -1216,7 +1217,7 @@ Function ConvertSub$ (m As Method, args As String, lineNumber As Integer)
     ' Let's handle the weirdo Line Input command which has a space;
     ' _Clipboard$ and _ClipboardImage SUBs too.
     ' TODO: this may have issues if used in combination with Input
-    If m.name = "Line" Or m.name = "_Clipboard$" Or m.name = "_ClipboardImage" Then
+    If m.name = "Line" Or m.name = "_Clipboard$" Or m.name = "_ClipboardImage" Or m.name = "Def" Then
         Dim parts(0) As String
         Dim plen As Integer
         plen = SLSplit(args, parts(), False)
@@ -1226,6 +1227,18 @@ Function ConvertSub$ (m As Method, args As String, lineNumber As Integer)
                 m.jsname = "QB.sub_LineInput"
                 args = Join(parts(), 2, -1, " ")
                 m.sync = True
+            ElseIf m.name = "Def" Then
+                ' DEF SEG [= expression]
+                If UCase$(parts(1)) = "SEG" Then
+                    m.jsname = "QB.sub_DefSeg"
+                    If plen > 1 AndAlso parts(2) = "=" Then
+                        args = Join(parts(), 3, -1, " ")
+                    Else
+                        args = ""
+                    End If
+                Else
+                    AddWarning lineNumber, "Unsupported DEF statement"
+                End If
             ElseIf parts(1) = "=" Then
                 Select Case m.name
                     Case "_Clipboard$"
@@ -4870,6 +4883,9 @@ Sub InitQBMethods
     AddQBMethod "FUNCTION", "Asc", False
     AddQBMethod "FUNCTION", "Atn", False
     AddQBMethod "SUB", "Beep", False
+    AddQBMethod "SUB", "Def", False
+    AddQBMethod "FUNCTION", "Peek", False
+    AddQBMethod "SUB", "Poke", False
     AddQBMethod "FUNCTION", "Chr$", False
     AddQBMethod "FUNCTION", "Cdbl", False
     AddQBMethod "SUB", "ChDir", False
