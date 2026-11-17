@@ -1701,6 +1701,7 @@ var QB = new function() {
     this.sub_Close = function(fh) {
         if (!fh) {
             for (const key in _fileHandles) {
+                _persistSave(_fileHandles[key]);
                 delete _fileHandles[key];
             }
             return;
@@ -1709,8 +1710,84 @@ var QB = new function() {
             throw new Error("Invalid file handle");
         }
 
+        _persistSave(_fileHandles[fh]);
         delete _fileHandles[fh];
     };
+
+    // Keeping files across page loads. A page that calls QB.persistFiles before it runs the program
+    // gets the files the program wrote (closed OUTPUT, APPEND and BINARY files) from IndexedDB, and
+    // the program's later changes are saved there when it closes, renames or deletes them.
+    var _persistDb = null;
+
+    this.persistFiles = async function(name) {
+        if (!window.indexedDB) { return false; }
+        try {
+            _persistDb = await new Promise((resolve, reject) => {
+                var req = indexedDB.open(name || "qbjs-files", 1);
+                req.onupgradeneeded = () => { req.result.createObjectStore("files"); };
+                req.onsuccess = () => resolve(req.result);
+                req.onerror = () => reject(req.error);
+            });
+            var records = await new Promise((resolve, reject) => {
+                var store = _persistDb.transaction("files").objectStore("files");
+                var all = [];
+                var req = store.openCursor();
+                req.onsuccess = () => {
+                    var cursor = req.result;
+                    if (cursor) { all.push({ path: cursor.key, value: cursor.value }); cursor.continue(); }
+                    else { resolve(all); }
+                };
+                req.onerror = () => reject(req.error);
+            });
+            var vfs = GX.vfs();
+            for (var i=0; i < records.length; i++) {
+                var node = _persistMakeParents(records[i].path);
+                var filename = vfs.getFileName(records[i].path);
+                if (records[i].value.dir) {
+                    if (!vfs.getNode(filename, node)) { vfs.createDirectory(filename, node); }
+                }
+                else {
+                    var file = vfs.createFile(filename, node);
+                    vfs.writeData(file, records[i].value.data);
+                }
+            }
+            return true;
+        }
+        catch (err) {
+            console.warn("QB.persistFiles: files will not be kept (" + err + ")");
+            _persistDb = null;
+            return false;
+        }
+    };
+
+    function _persistMakeParents(path) {
+        var vfs = GX.vfs();
+        var node = vfs.rootDirectory();
+        var dirs = vfs.getParentPath(path).split("/");
+        for (var i=0; i < dirs.length; i++) {
+            if (dirs[i] == "") { continue; }
+            var child = vfs.getNode(dirs[i], node);
+            if (!child) { child = vfs.createDirectory(dirs[i], node); }
+            node = child;
+        }
+        return node;
+    }
+
+    function _persistPut(path, value) {
+        if (!_persistDb) { return; }
+        _persistDb.transaction("files", "readwrite").objectStore("files").put(value, path);
+    }
+
+    function _persistDelete(path) {
+        if (!_persistDb) { return; }
+        _persistDb.transaction("files", "readwrite").objectStore("files").delete(path);
+    }
+
+    // Saves the file of a handle that is being closed, unless it was only read.
+    function _persistSave(handle) {
+        if (!_persistDb || !handle || handle.mode == QB.INPUT) { return; }
+        _persistPut(GX.vfs().fullPath(handle.file), { data: handle.file.data });
+    }
 
     this.sub_Cls = function(method, bgColor) {
         // there is no separate view port for text, so only the graphics view port (VIEW) is used:
@@ -2713,7 +2790,11 @@ var QB = new function() {
 
     this.sub_Kill = function(path) {
         _assertParam(path);
-        GX.vfs().removeFile(path, GX.vfsCwd());
+        var vfs = GX.vfs();
+        var node = vfs.getNode(path, GX.vfsCwd());
+        var fullPath = node ? vfs.fullPath(node) : null;
+        vfs.removeFile(path, GX.vfsCwd());
+        if (fullPath) { _persistDelete(fullPath); }
     };
 
     this.func_Mid = function(value, n, len) {
@@ -2750,7 +2831,8 @@ var QB = new function() {
         var filename = vfs.getFileName(path);
         var parentNode = vfs.getNode(parent, vfsCwd);
         if (!parentNode) { parentNode = vfsCwd; }
-        vfs.createDirectory(filename, parentNode);
+        var dir = vfs.createDirectory(filename, parentNode);
+        _persistPut(vfs.fullPath(dir), { dir: true });
     }
 
     this.func_MKI = function(num) {
@@ -2820,7 +2902,12 @@ var QB = new function() {
         var vfs = GX.vfs();
         var vfsCwd = GX.vfsCwd();
         var node = vfs.getNode(oldName, vfsCwd);
+        var oldPath = vfs.fullPath(node);
         vfs.renameNode(node, newName);
+        if (_persistDb) {
+            _persistDelete(oldPath);
+            if (node.type == vfs.FILE) { _persistPut(vfs.fullPath(node), { data: node.data }); }
+        }
     };
 
     this.func_Oct = function(n) {
@@ -3878,7 +3965,11 @@ var QB = new function() {
 
     this.sub_RmDir = function(path) {
         _assertParam(path);
-        GX.vfs().removeDirectory(path, GX.vfsCwd());
+        var vfs = GX.vfs();
+        var node = vfs.getNode(path, GX.vfsCwd());
+        var fullPath = node ? vfs.fullPath(node) : null;
+        vfs.removeDirectory(path, GX.vfsCwd());
+        if (fullPath && !vfs.getNode(fullPath)) { _persistDelete(fullPath); }
     };
 
     this.func_Rnd = function(n) {
