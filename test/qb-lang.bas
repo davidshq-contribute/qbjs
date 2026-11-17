@@ -71,4 +71,44 @@ UT.AssertEquals Peek(100), 7
 Def Seg
 UT.AssertEquals Peek(100), 65
 
+' DEFINT, DEFLNG, DEFSNG, DEFDBL, DEFSTR and _DEFINE give a name without a suffix its type, from the
+' letters given, for the lines that follow (and for the procedures that follow)
+dtx = 2.7
+UT.AssertEquals dtx, 2.7
+DEFINT A-C
+aa = 2.7
+UT.AssertEquals aa, 3
+bb! = 2.7
+UT.AssertEquals bb!, 2.7
+DEFLNG E
+ee = 5.6
+UT.AssertEquals ee, 6
+DEFDBL F
+ff = 1.0000001
+UT.AssertEquals ff, 1.0000001
+DEFSTR S
+ss = "hi"
+UT.AssertEquals Len(ss), 2
+DEFINT I-K, M
+kk = 3.4
+UT.AssertEquals kk, 3
+mm = 3.6
+UT.AssertEquals mm, 4
+nn = 3.6
+UT.AssertEquals nn, 3.6
+_DEFINE P-Q AS INTEGER
+pp = 9.9
+UT.AssertEquals pp, 10
+UT.AssertEquals bAddOne(1.4), 1
+UT.AssertEquals dtTwice(2.6), 5.2
+
 Console.Echo "QB Language - tests completed with no errors* in " + (Sys.TimeInMillis - ts) + " millisecond(s)"
+
+Function bAddOne (aval)
+    bAddOne = aval + 0.4
+End Function
+
+DEFSNG A-Z
+Function dtTwice (q)
+    dtTwice = q * 2
+End Function

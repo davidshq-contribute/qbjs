@@ -123,6 +123,14 @@ Dim Shared As String condWords(4)
 Dim Shared As Integer forceSelfConvert
 Dim Shared As Integer optionExplicit
 Dim Shared As Integer optionExplicitArray
+' DEFINT and the other DEF statements. Entry i covers the letters defFirst(i) to defLast(i) (1 to 26)
+' from line defLine(i) on. A name without a suffix gets the type of the last entry that covers its
+' first letter and starts at or before defCurLine; defCurLine is 0 while built-in methods are registered.
+ReDim Shared As Integer defLine(0)
+ReDim Shared As Integer defFirst(0)
+ReDim Shared As Integer defLast(0)
+ReDim Shared As String defType(0)
+Dim Shared As Integer defCurLine
 
 Sub QBToJS (source As String, sourceType As Integer, moduleName As String)
     condWords(1) = "IF": condWords(2) = "ELSEIF": condWords(3) = "WHILE": condWords(4) = "UNTIL"
@@ -282,6 +290,7 @@ Sub Compile (source As String, moduleName As String, selfConvert)
     AddJSLine 0, "} await main();"
 
     ConvertMethods
+    defCurLine = 0
 
     If Not selfConvert And moduleName = "" Then InitTypes
 
@@ -420,6 +429,11 @@ Sub ResetDataStructures
     ReDim As Module modules(0)
     ReDim As Method exportMethods(0)
     ReDim As Variable exportConsts(0)
+    ReDim As Integer defLine(0)
+    ReDim As Integer defFirst(0)
+    ReDim As Integer defLast(0)
+    ReDim As String defType(0)
+    defCurLine = 0
     currentMethod = ""
     programMethods = 0
     staticVarLine = 0
@@ -471,6 +485,7 @@ Sub ConvertLines (firstLine As Integer, lastLine As Integer, functionName As Str
     implicitVarLine = UBound(jsLines)
 
     For i = firstLine To lastLine
+        defCurLine = i
         indent = 0
         tempIndent = 0
         Dim l As String
@@ -557,6 +572,9 @@ Sub ConvertLines (firstLine As Integer, lastLine As Integer, functionName As Str
                         AddConst String.Trim(cleft), functionName
                     End If
                 Next constIdx
+
+            ElseIf first = "DEFINT" Or first = "DEFLNG" Or first = "DEFSNG" Or first = "DEFDBL" Or first = "DEFSTR" Or first = "_DEFINE" Then
+                ' already recorded by FindMethods; the types apply to the lines that follow
 
             ElseIf first = "OPTION" Then
                 second = UCase$(String.Trim(parts(2)))
@@ -2980,6 +2998,7 @@ Sub ConvertMethods ()
     For i = 1 To UBound(methods)
         If (methods(i).line <> 0) Then
             'currentMethod = methods(i).name
+            defCurLine = methods(i).line
 
             Dim lastLine As Integer
             lastLine = methods(i).lastLine
@@ -3448,6 +3467,11 @@ Sub FindMethods
         If Left$(word, 4) = "$END" And rawJS Then rawJS = False
         If rawJS Then _Continue
 
+        defCurLine = i
+        If word = "DEFINT" Or word = "DEFLNG" Or word = "DEFSNG" Or word = "DEFDBL" Or word = "DEFSTR" Or word = "_DEFINE" Then
+            RegisterDefType i, word, Join(parts(), 2, -1, " ")
+        End If
+
         If word = "FUNCTION" Or word = "SUB" Then
             ' Find start and end parameters, if present to get argument list
             Dim mstr As String
@@ -3523,6 +3547,7 @@ Sub FindMethods
             End If
         End If
     Next i
+    defCurLine = 0
 End Sub
 
 ' TODO: look at refactoring this - do we really need 3 different variations of a split function?
@@ -4335,11 +4360,87 @@ Function DataTypeFromName$ (vname As String)
     ElseIf String.EndsWith(vname, "!") Then
         dt = "SINGLE"
     Else
-        dt = "SINGLE"
+        dt = DefaultDataType(vname)
     End If
 
     DataTypeFromName = dt
 End Function
+
+' The type of a name with no suffix: SINGLE, unless a DEFINT, DEFLNG, DEFSNG, DEFDBL, DEFSTR or
+' _DEFINE statement at or before defCurLine covers its first letter.
+Function DefaultDataType$ (vname As String)
+    Dim dt As String
+    dt = "SINGLE"
+    Dim letter As Integer
+    letter = Asc(UCase$(Left$(String.Trim(vname), 1))) - 64
+    If letter < 1 Or letter > 26 Then
+        DefaultDataType = dt
+        Exit Function
+    End If
+
+    Dim i As Integer
+    For i = UBound(defLine) To 1 Step -1
+        If defLine(i) <= defCurLine And letter >= defFirst(i) And letter <= defLast(i) Then
+            dt = defType(i)
+            Exit For
+        End If
+    Next i
+    DefaultDataType = dt
+End Function
+
+' Records a DEFINT-style statement found on a line. keyword is DEFINT, DEFLNG, DEFSNG, DEFDBL,
+' DEFSTR or _DEFINE; letters is the rest of the line: "A-Z", "I-N, X", or for _DEFINE "A-Z AS INTEGER".
+Sub RegisterDefType (lineNumber As Integer, keyword As String, letters As String)
+    Dim dt As String
+    Select Case keyword
+        Case "DEFINT": dt = "INTEGER"
+        Case "DEFLNG": dt = "LONG"
+        Case "DEFSNG": dt = "SINGLE"
+        Case "DEFDBL": dt = "DOUBLE"
+        Case "DEFSTR": dt = "STRING"
+        Case Else
+            Dim asIdx As Integer
+            asIdx = InStr(UCase$(letters), " AS ")
+            If asIdx < 1 Then
+                AddWarning lineNumber, "Syntax error"
+                Exit Sub
+            End If
+            dt = NormalizeType(UCase$(String.Trim(Mid$(letters, asIdx + 4))))
+            letters = Left$(letters, asIdx - 1)
+    End Select
+
+    ReDim As String items(0)
+    Dim count As Integer
+    count = ListSplit(letters, items())
+    Dim i As Integer
+    For i = 1 To count
+        Dim item As String
+        item = String.Replace(String.Trim(items(i)), " ", "")
+        If item <> "" Then
+            Dim firstLetter As Integer, lastLetter As Integer
+            firstLetter = Asc(UCase$(Left$(item, 1))) - 64
+            lastLetter = Asc(UCase$(Right$(item, 1))) - 64
+            If firstLetter > lastLetter Then
+                Dim tmp As Integer
+                tmp = firstLetter: firstLetter = lastLetter: lastLetter = tmp
+            End If
+            If firstLetter < 1 Or lastLetter > 26 Then
+                AddWarning lineNumber, "Syntax error"
+            Else
+                Dim dcount As Integer
+                dcount = UBound(defLine) + 1
+                ReDim _Preserve As Integer defLine(dcount)
+                ReDim _Preserve As Integer defFirst(dcount)
+                ReDim _Preserve As Integer defLast(dcount)
+                ReDim _Preserve As String defType(dcount)
+                defLine(dcount) = lineNumber
+                defFirst(dcount) = firstLetter
+                defLast(dcount) = lastLetter
+                defType(dcount) = dt
+            End If
+        End If
+    Next i
+End Sub
 
 Function Join$ (parts() As String, startIndex As Integer, endIndex As Integer, delimiter As String)
     If endIndex = -1 Then endIndex = UBound(parts)
