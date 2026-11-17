@@ -1403,7 +1403,19 @@ Function ConvertSub$ (m As Method, args As String, lineNumber As Integer)
         js = CallMethod(m) + "(" + ConvertOpen(args, lineNumber) + ");"
 
     ElseIf m.name = "Close" Then
-        js = CallMethod(m) + "(" + String.Replace(args, "#", "") + ");"
+        ' CLOSE alone closes every file; CLOSE #1, #f% closes each file named, one call each
+        If String.Trim(args) = "" Then
+            js = CallMethod(m) + "();"
+        Else
+            ReDim closeParts(0) As String
+            Dim As Integer closeCount, closeIdx
+            closeCount = ListSplit(args, closeParts())
+            js = ""
+            For closeIdx = 1 To closeCount
+                If closeIdx > 1 Then js = js + " "
+                js = js + CallMethod(m) + "(" + ConvertFileNumber(closeParts(closeIdx), lineNumber) + ");"
+            Next closeIdx
+        End If
 
         'ElseIf m.name = "Get" Then
         '    js = ConvertGet(m, args, lineNumber)
@@ -1560,7 +1572,7 @@ Function ConvertPut$ (m As Method, args As String, lineNumber As Integer)
     vname = String.Trim(parts(3))
     vname = String.Replace(vname, "()", "")
 
-    fh = String.Replace(fh, "#", "")
+    fh = ConvertFileNumber(fh, lineNumber)
     If position = "" Then position = "undefined"
 
     Dim v As Variable
@@ -1648,9 +1660,18 @@ Function ConvertOpen$ (args As String, lineNumber As Integer)
 
     filename = String.Trim(ConvertExpression(Join(parts(), 1, forIdx - 1, " "), lineNumber))
     mode = "QB." + UCase$(parts(forIdx + 1))
-    handle = String.Trim(ConvertExpression(String.Replace(parts(asIdx + 1), "#", ""), lineNumber))
+    handle = ConvertFileNumber(parts(asIdx + 1), lineNumber)
 
     ConvertOpen = filename + ", " + mode + ", " + handle
+End Function
+
+' A file number: #1, 1, #f or #f%. Only the # in front is taken off, so that a variable's own suffix (n%,
+' d#) stays for ConvertExpression, which gives the variable's JavaScript name.
+Function ConvertFileNumber$ (text As String, lineNumber As Integer)
+    Dim fn As String
+    fn = String.Trim(text)
+    If String.StartsWith(fn, "#") Then fn = Mid$(fn, 2)
+    ConvertFileNumber = String.Trim(ConvertExpression(fn, lineNumber))
 End Function
 
 ' OPEN mode, [#]handle, file [, record length], where the mode is a string of I, O, A, R or B
@@ -1680,7 +1701,7 @@ Function ConvertOpenOriginal$ (args As String, lineNumber As Integer)
         Exit Function
     End If
 
-    ConvertOpenOriginal = String.Trim(ConvertExpression(parts(3), lineNumber)) + ", " + mode + ", " + String.Trim(ConvertExpression(String.Replace(parts(2), "#", ""), lineNumber))
+    ConvertOpenOriginal = String.Trim(ConvertExpression(parts(3), lineNumber)) + ", " + mode + ", " + ConvertFileNumber(parts(2), lineNumber)
 End Function
 
 Function ConvertLine$ (args As String, lineNumber As Integer)
@@ -2040,7 +2061,7 @@ Function ConvertPrint$ (m As Method, args As String, lineNumber As Integer)
     m.jsname = "QB.sub_Print"
     If pcount > 0 Then
         If String.StartsWith(String.Trim(parts(1)), "#") Then
-            fh = String.Replace(String.Trim(parts(1)), "#", "")
+            fh = ConvertFileNumber(parts(1), lineNumber)
             m.jsname = "QB.sub_PrintToFile"
             startIdx = 3
             If String.Trim(parts(2)) <> "," Then
@@ -2121,7 +2142,7 @@ Function ConvertWrite$ (m As Method, args As String, lineNumber As Integer)
     m.jsname = "QB.sub_Write"
     If pcount > 0 Then
         If String.StartsWith(String.Trim(parts(1)), "#") Then
-            fh = String.Replace(String.Trim(parts(1)), "#", "")
+            fh = ConvertFileNumber(parts(1), lineNumber)
             m.jsname = "QB.sub_WriteToFile"
             startIdx = 2
         End If
@@ -2199,7 +2220,7 @@ Function ConvertFileLineInput$ (m As Method, args As String, lineNumber As Integ
         Exit Function
     End If
 
-    fh = String.Replace(String.Trim(parts(1)), "#", "")
+    fh = ConvertFileNumber(parts(1), lineNumber)
     retvar = String.Trim(parts(2))
 
     vname = GenJSVar
@@ -2248,14 +2269,17 @@ Function ConvertInput$ (m As Method, args As String, lineNumber As Integer)
     For i = 1 To UBound(vars)
         ' Convert to appropriate variable type on assignment
         Dim vartype As String
+        Dim target As String
+        ' converted first, so that a variable first used here is declared before its type is asked for
+        target = ConvertExpression(vars(i), lineNumber)
         vartype = GetVarType(vars(i))
         If vartype = "_BIT" Or vartype = "_BYTE" Or vartype = "INTEGER" Or vartype = "LONG" Or vartype = "_INTEGER64" Or vartype = "_OFFSET" Or _
            vartype = "_UNSIGNED _BIT" Or vartype = "_UNSIGNED _BYTE" Or vartype = "_UNSIGNED INTEGER" Or vartype = "_UNSIGNED LONG" Or vartype = "_UNSIGNED _INTEGER64" Or vartype = "_UNSIGNED _OFFSET" Then
-            js = js + ConvertExpression(vars(i), lineNumber) + " = QB.toInteger(" + vname + "[" + Str$(i - 1) + "]" + ToIntegerWide(vartype) + "); "
+            js = js + target + " = QB.toInteger(" + vname + "[" + Str$(i - 1) + "]" + ToIntegerWide(vartype) + "); "
         ElseIf vartype = "SINGLE" Or vartype = "DOUBLE" Or vartype = "_FLOAT" Then
-            js = js + ConvertExpression(vars(i), lineNumber) + " = QB.toFloat(" + vname + "[" + Str$(i - 1) + "]); "
+            js = js + target + " = QB.toFloat(" + vname + "[" + Str$(i - 1) + "]); "
         Else
-            js = js + ConvertExpression(vars(i), lineNumber) + " = " + vname + "[" + Str$(i - 1) + "]; "
+            js = js + target + " = " + vname + "[" + Str$(i - 1) + "]; "
         End If
         'End If
     Next i
@@ -2277,7 +2301,7 @@ Function ConvertFileInput$ (m As Method, args As String, lineNumber As Integer)
         Exit Function
     End If
 
-    fh = String.Replace(String.Trim(parts(1)), "#", "")
+    fh = ConvertFileNumber(parts(1), lineNumber)
     retvar = String.Trim(parts(2))
 
     vname = GenJSVar
@@ -2290,16 +2314,19 @@ Function ConvertFileInput$ (m As Method, args As String, lineNumber As Integer)
         If i > 2 Then numeric = numeric + ","
         ' Convert to appropriate variable type on assignment
         Dim vartype As String
+        Dim target As String
+        ' converted first, so that a variable first used here is declared before its type is asked for
+        target = ConvertExpression(parts(i), lineNumber)
         vartype = GetVarType(parts(i))
         If vartype = "_BIT" Or vartype = "_BYTE" Or vartype = "INTEGER" Or vartype = "LONG" Or vartype = "_INTEGER64" Or vartype = "_OFFSET" Or _
            vartype = "_UNSIGNED _BIT" Or vartype = "_UNSIGNED _BYTE" Or vartype = "_UNSIGNED INTEGER" Or vartype = "_UNSIGNED LONG" Or vartype = "_UNSIGNED _INTEGER64" Or vartype = "_UNSIGNED _OFFSET" Then
-            assigns = assigns + ConvertExpression(parts(i), lineNumber) + " = QB.toInteger(" + vname + "[" + Str$(i - 2) + "]" + ToIntegerWide(vartype) + "); "
+            assigns = assigns + target + " = QB.toInteger(" + vname + "[" + Str$(i - 2) + "]" + ToIntegerWide(vartype) + "); "
             numeric = numeric + "true"
         ElseIf vartype = "SINGLE" Or vartype = "DOUBLE" Or vartype = "_FLOAT" Then
-            assigns = assigns + ConvertExpression(parts(i), lineNumber) + " = QB.toFloat(" + vname + "[" + Str$(i - 2) + "]); "
+            assigns = assigns + target + " = QB.toFloat(" + vname + "[" + Str$(i - 2) + "]); "
             numeric = numeric + "true"
         Else
-            assigns = assigns + ConvertExpression(parts(i), lineNumber) + " = " + vname + "[" + Str$(i - 2) + "]; "
+            assigns = assigns + target + " = " + vname + "[" + Str$(i - 2) + "]; "
             numeric = numeric + "false"
         End If
     Next i
