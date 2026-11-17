@@ -1,0 +1,8 @@
+{
+  "name": "qbjs-headless-tests",
+  "private": true,
+  "description": "Runs QBJS's unit tests (test/qb-all-tests.bas) in a headless Chrome",
+  "dependencies": {
+    "puppeteer-core": "^24.0.0"
+  }
+}

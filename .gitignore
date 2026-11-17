@@ -8,3 +8,5 @@ qbjs.zip
 .vscode/settings.json
 .vscode/tasks.json
 .DS_Store
+test/headless/node_modules/
+test/headless/package-lock.json
