@@ -246,6 +246,25 @@ ArrayParamLoad apNames$(), apCounts%()
 UT.AssertEquals apNames$(1), "Lee"
 UT.AssertEquals apCounts%(1), 2
 Kill "test.txt"
+
+' a file number in a variable with a type suffix (#fn%, #fd#), a variable that INPUT # uses first, and
+' CLOSE of two files at once
+Dim fn%, fd#, fnLine$
+fd# = 1: fn% = 2
+Open "test.txt" For Output As #fn%
+Print #fn%, "one"
+Write #fn%, 2
+Close #fn%
+Open "test2.txt" For Output As #fd#
+Open "test.txt" For Input As #fn%
+Line Input #fn%, fnLine$
+UT.AssertEquals fnLine$, "one"
+Input #fn%, fnFirstUse
+UT.AssertEquals fnFirstUse + 1, 3
+Close #fn%, #fd#
+UT.AssertEquals FreeFile, 1
+Kill "test.txt"
+Kill "test2.txt"
 Sub ArrayParamLoad (names$(), counts%())
     Open "test.txt" For Input As #1
     Input #1, names$(1), counts%(1)
