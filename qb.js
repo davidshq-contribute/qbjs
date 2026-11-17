@@ -3462,6 +3462,74 @@ var QB = new function() {
         }
     }
 
+    // Graphics GET and PUT. The rectangle is kept on the array object (a._image), not in QB's own
+    // byte layout, so a program cannot read the array's elements.
+    this.sub_GetGraphics = function(sstep, sx, sy, estep, ex, ey, arr) {
+        var screen = _images[_activeImage];
+        _flushScreenCache(screen);
+
+        if (sstep) {
+            sx = screen.lastX + sx;
+            sy = screen.lastY + sy;
+        }
+        if (sx == undefined) {
+            sx = screen.lastX;
+            sy = screen.lastY;
+        }
+        if (estep) {
+            ex = sx + ex;
+            ey = sy + ey;
+        }
+        screen.lastX = ex;
+        screen.lastY = ey;
+
+        var x1 = Math.floor(Math.min(sx, ex)), x2 = Math.floor(Math.max(sx, ex));
+        var y1 = Math.floor(Math.min(sy, ey)), y2 = Math.floor(Math.max(sy, ey));
+        arr._image = screen.ctx.getImageData(x1, y1, x2 - x1 + 1, y2 - y1 + 1);
+    };
+
+    this.sub_PutGraphics = function(sstep, x, y, arr, action) {
+        var screen = _images[_activeImage];
+        _flushScreenCache(screen);
+
+        if (arr._image == undefined) {
+            return;
+        }
+        if (sstep) {
+            x = screen.lastX + x;
+            y = screen.lastY + y;
+        }
+        screen.lastX = x;
+        screen.lastY = y;
+        x = Math.floor(x);
+        y = Math.floor(y);
+
+        var src = arr._image;
+        var ctx = screen.ctx;
+        if (action == "PSET") {
+            ctx.putImageData(src, x, y);
+            return;
+        }
+
+        // The other actions combine the red, green and blue values pixel by pixel. QB combines
+        // palette numbers, which only matches this for colors whose bits line up.
+        // The default action is XOR.
+        var dst = ctx.getImageData(x, y, src.width, src.height);
+        for (var i = 0; i < src.data.length; i += 4) {
+            for (var j = 0; j < 3; j++) {
+                var s = src.data[i + j], d = dst.data[i + j];
+                switch (action) {
+                    case "PRESET": d = 255 - s; break;
+                    case "AND": d = d & s; break;
+                    case "OR": d = d | s; break;
+                    default: d = d ^ s; break;
+                }
+                dst.data[i + j] = d;
+            }
+        }
+        ctx.putImageData(dst, x, y);
+    };
+
     this.sub_Get = function(fhi, position, type, valueObj) {
         if (!_fileHandles[fhi]) {
             throw new Error("Invalid file handle");

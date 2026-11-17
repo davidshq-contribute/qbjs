@@ -2155,6 +2155,36 @@ var ConvertSub = null;
    ConvertSub =  js;
 return ConvertSub;
 }
+async function func_ConvertGraphicsGetPut(m/*METHOD*/,parts/*STRING*/,argc/*INTEGER*/,lineNumber/*INTEGER*/) {
+if (QB.halted()) { return; }; argc = Math.round(argc); lineNumber = Math.round(lineNumber); 
+var ConvertGraphicsGetPut = null;
+/* implicit variables: */ 
+   if ( argc < 2) {
+      await sub_AddWarning(  lineNumber,   "Syntax error");
+      return ConvertGraphicsGetPut;
+   }
+   var coord = '';  /* STRING */ var vname = '';  /* STRING */ var action = '';  /* STRING */ 
+   vname = (await String.func_Replace( (await String.func_Trim( QB.arrayValue(parts, [ 2]).value)) ,   "()" ,   ""));
+   action = "undefined";
+   var v = {type:'',name:'',jsname:'',isConst:0,isArray:0,arraySize:0,typeId:0};  /* VARIABLE */ 
+   if (~(await func_FindVariable(  vname,    v,    False)) ) {
+      if (~(await func_FindVariable(  vname,    v,    True)) ) {
+         await sub_AddWarning(  lineNumber,   "Invalid variable '"  +  vname + "'");
+         return ConvertGraphicsGetPut;
+      }
+   }
+   if ( m.name ==  "Put" ) {
+      coord = (await func_ConvertCoordParam( QB.arrayValue(parts, [ 1]).value ,    False,    lineNumber));
+      if ( argc >=  3) {
+         action = "'"  + (QB.func_UCase( (await String.func_Trim( QB.arrayValue(parts, [ 3]).value))))  + "'";
+      }
+      ConvertGraphicsGetPut = "QB.sub_PutGraphics("  +  coord + ", "  +  v.jsname + ", "  +  action + ");";
+   } else {
+      coord = (await func_ConvertCoordParam( QB.arrayValue(parts, [ 1]).value ,    True,    lineNumber));
+      ConvertGraphicsGetPut = "QB.sub_GetGraphics("  +  coord + ", "  +  v.jsname + ");";
+   }
+return ConvertGraphicsGetPut;
+}
 async function func_ConvertPut(m/*METHOD*/,args/*STRING*/,lineNumber/*INTEGER*/) {
 if (QB.halted()) { return; }; lineNumber = Math.round(lineNumber); 
 var ConvertPut = null;
@@ -2162,6 +2192,14 @@ var ConvertPut = null;
    var parts = QB.initArray([{l:0,u: 0}], '');  /* STRING */ 
    var argc = 0;  /* INTEGER */ 
    argc = Math.round( (await func_ListSplit(  args,   parts)) );
+   if ( argc >=  1) {
+      var firstArg = '';  /* STRING */ 
+      firstArg = (QB.func_UCase( (await String.func_Trim( QB.arrayValue(parts, [ 1]).value))));
+      if ((await String.func_StartsWith(  firstArg,   "("))  | (await String.func_StartsWith(  firstArg,   "STEP("))  | (await String.func_StartsWith(  firstArg,   "STEP (")) ) {
+         ConvertPut = (await func_ConvertGraphicsGetPut(  m,   parts ,    argc,    lineNumber));
+         return ConvertPut;
+      }
+   }
    if ( argc < 3) {
       await sub_AddWarning(  lineNumber,   "Syntax error");
       return ConvertPut;

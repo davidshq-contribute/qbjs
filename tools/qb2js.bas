@@ -1343,10 +1343,49 @@ Function ConvertSub$ (m As Method, args As String, lineNumber As Integer)
     ConvertSub = js
 End Function
 
+Function ConvertGraphicsGetPut$ (m As Method, parts() As String, argc As Integer, lineNumber As Integer)
+    If argc < 2 Then
+        AddWarning lineNumber, "Syntax error"
+        Exit Function
+    End If
+
+    Dim As String coord, vname, action
+    vname = String.Replace(String.Trim(parts(2)), "()", "")
+    action = "undefined"
+
+    Dim v As Variable
+    If Not FindVariable(vname, v, False) Then
+        If Not FindVariable(vname, v, True) Then
+            AddWarning lineNumber, "Invalid variable '" + vname + "'"
+            Exit Function
+        End If
+    End If
+
+    If m.name = "Put" Then
+        coord = ConvertCoordParam(parts(1), False, lineNumber)
+        If argc >= 3 Then action = "'" + UCase$(String.Trim(parts(3))) + "'"
+        ConvertGraphicsGetPut = "QB.sub_PutGraphics(" + coord + ", " + v.jsname + ", " + action + ");"
+    Else
+        coord = ConvertCoordParam(parts(1), True, lineNumber)
+        ConvertGraphicsGetPut = "QB.sub_GetGraphics(" + coord + ", " + v.jsname + ");"
+    End If
+End Function
+
 Function ConvertPut$ (m As Method, args As String, lineNumber As Integer)
     ReDim parts(0) As String
     Dim argc As Integer
     argc = ListSplit(args, parts())
+
+    ' The graphics form, GET (x1, y1)-(x2, y2), array and PUT (x, y), array [, action],
+    ' starts with a coordinate pair; the file form starts with a file number.
+    If argc >= 1 Then
+        Dim firstArg As String
+        firstArg = UCase$(String.Trim(parts(1)))
+        If String.StartsWith(firstArg, "(") Or String.StartsWith(firstArg, "STEP(") Or String.StartsWith(firstArg, "STEP (") Then
+            ConvertPut = ConvertGraphicsGetPut(m, parts(), argc, lineNumber)
+            Exit Function
+        End If
+    End If
 
     If argc < 3 Then
         AddWarning lineNumber, "Syntax error"
