@@ -38,6 +38,14 @@ UT.AssertEquals 100000&, 100000
 UT.AssertEquals 3.5!, 3.5
 UT.AssertEquals 42%, 42
 
+' an array named with a type suffix has that type: names$(3) is a STRING array
+Dim suffixNames$(3), suffixCounts%(3), suffixBig&(3)
+suffixNames$(2) = "text"
+UT.AssertEquals suffixNames$(2), "text"
+UT.AssertEquals suffixNames$(1), ""
+suffixCounts%(1) = 2.6
+UT.AssertEquals suffixCounts%(1), 3
+
 ' DEF SEG, PEEK and POKE: a memory of bytes, empty at the start, values taken AND 255
 Def Seg = 0
 UT.AssertEquals Peek(100), 0

@@ -2296,7 +2296,12 @@ Function DeclareVar$ (parts() As String, lineNumber As Integer)
 
             vpartcount = SLSplit2(varnames(i), vparts())
             If vpartcount = 1 Then
-                bvar.type = DataTypeFromName(vparts(1))
+                ' The type comes from the suffix of the name, not of the bounds: name$(10) is a STRING array
+                If InStr(vparts(1), "(") > 0 Then
+                    bvar.type = DataTypeFromName(Left$(vparts(1), InStr(vparts(1), "(") - 1))
+                Else
+                    bvar.type = DataTypeFromName(vparts(1))
+                End If
             ElseIf vpartcount = 3 Then
                 bvar.type = UCase$(vparts(3))
             ElseIf vpartcount = 4 Then

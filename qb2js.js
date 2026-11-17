@@ -3151,7 +3151,11 @@ var DeclareVar = null;
       var ___v3158374 = 0; ___l9836021: for ( i=  1; (1 > 0) ? ( i <=  vnamecount) : ( i >=  vnamecount);  i+=1) { if (QB.halted()) { return; } ___v3158374++;   if (___v3158374 % 100 == 0) { await QB.autoLimit(); }
          vpartcount = Math.round( (await func_SLSplit2( QB.arrayValue(varnames, [ i]).value ,   vparts)) );
          if ( vpartcount ==   1) {
-            bvar.type = (await func_DataTypeFromName( QB.arrayValue(vparts, [ 1]).value));
+            if ((QB.func_InStr( QB.arrayValue(vparts, [ 1]).value ,   "("))  > 0) {
+               bvar.type = (await func_DataTypeFromName( (QB.func_Left( QB.arrayValue(vparts, [ 1]).value ,   (QB.func_InStr( QB.arrayValue(vparts, [ 1]).value ,   "("))  -  1))));
+            } else {
+               bvar.type = (await func_DataTypeFromName( QB.arrayValue(vparts, [ 1]).value));
+            }
          } else if ( vpartcount ==   3) {
             bvar.type = (QB.func_UCase( QB.arrayValue(vparts, [ 3]).value));
          } else if ( vpartcount ==   4) {
