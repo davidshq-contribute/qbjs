@@ -2681,7 +2681,12 @@ Function ConvertExpression$ (ex As String, lineNumber As Integer)
                             End If
                         End If
                     Else
-                        js = js + fneg + "(" + ConvertExpression(ex2, lineNumber) + ")"
+                        If String.Trim(word) = "" AndAlso Right$(RTrim$(js), 1) = "~" Then
+                            ' NOT (...): a comparison is a JavaScript boolean, which "~" turns into a number that is always true
+                            js = Left$(RTrim$(js), Len(RTrim$(js)) - 1) + "QB.not(" + ConvertExpression(ex2, lineNumber) + ")"
+                        Else
+                            js = js + fneg + "(" + ConvertExpression(ex2, lineNumber) + ")"
+                        End If
                     End If
                 End If
                 word = ""

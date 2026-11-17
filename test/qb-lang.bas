@@ -38,6 +38,17 @@ UT.AssertEquals 100000&, 100000
 UT.AssertEquals 3.5!, 3.5
 UT.AssertEquals 42%, 42
 
+' NOT of a parenthesized comparison or number
+Dim notA, notB, notCount
+notA = 3: notB = 5: notCount = 0
+If Not (notA > notB) Then notCount = notCount + 1
+If Not (notA < notB) Then notCount = notCount + 10
+UT.AssertEquals notCount, 1
+UT.AssertEquals Not (notA < notB), 0
+UT.AssertEquals Not (notA > notB), -1
+UT.AssertEquals Not (0), -1
+UT.AssertEquals Not (5), -6
+
 ' an array named with a type suffix has that type: names$(3) is a STRING array
 Dim suffixNames$(3), suffixCounts%(3), suffixBig&(3)
 suffixNames$(2) = "text"

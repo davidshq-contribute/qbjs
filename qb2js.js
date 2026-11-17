@@ -3529,7 +3529,11 @@ var ConvertExpression = null;
                      }
                   }
                } else {
-                  js =  js +  fneg + "("  + (await func_ConvertExpression(  ex2,    lineNumber))  + ")";
+                  if ((await String.func_Trim(  word))  ==  ""  && (QB.func_Right( (QB.func_RTrim(  js)) ,    1))  ==  "~" ) {
+                     js = (QB.func_Left( (QB.func_RTrim(  js)) ,   (QB.func_Len( (QB.func_RTrim(  js))))  -  1))  + "QB.not("  + (await func_ConvertExpression(  ex2,    lineNumber))  + ")";
+                  } else {
+                     js =  js +  fneg + "("  + (await func_ConvertExpression(  ex2,    lineNumber))  + ")";
+                  }
                }
             }
             word = "";

@@ -317,6 +317,15 @@ var QB = new function() {
         _resizeHeight = height;
     }
 
+    // NOT of a value. A comparison is a JavaScript boolean here, and ~true and ~false are both
+    // truthy, so a boolean gives QB's result for its -1 or 0 instead.
+    this.not = function(value) {
+        if (typeof value == "boolean") {
+            return value ? 0 : -1;
+        }
+        return ~value;
+    };
+
     // Data type conversions
     this.toInteger = function(value) {
         var result = parseInt(value);
@@ -2278,22 +2287,38 @@ var QB = new function() {
         }
 
         fh = _fileHandles[fh];
-        var text = GX.vfs().readLine(fh.file, fh.offset);
-        fh.offset += text.length + 1;
-        var values = text.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g) || [];
+        // Like QB, read one field for each variable, from where the last INPUT # stopped. A field ends at a
+        // comma or at the end of a line, and that one delimiter is taken with it, so a statement with more
+        // variables than the line has fields goes on to the next line.
+        var view = new Uint8Array(fh.file.data);
+        var pos = fh.offset;
+        var n = view.length;
         for (var i=0; i < returnValues.length; i++) {
-            if (i < values.length) {
-                var v = values[i];
-                // remove surrounding double quotes from string values
-                if (v.startsWith('"') && v.endsWith('"')) {
-                    v = v.substring(1, v.length-1);
-                }
-                returnValues[i] = v;
+            // skip spaces before the field; a line ending here is an empty field
+            while (pos < n && (view[pos] == 32 || view[pos] == 9)) { pos++; }
+            if (pos >= n) {
+                fh.offset = pos;
+                throw new Error("Input past end of file");
+            }
+            var v = "";
+            if (view[pos] == 34) {
+                // a quoted field ends at the closing quote; what follows it up to the delimiter is dropped
+                pos++;
+                while (pos < n && view[pos] != 34 && view[pos] != 13 && view[pos] != 10) { v += String.fromCharCode(view[pos]); pos++; }
+                if (pos < n && view[pos] == 34) { pos++; }
+                while (pos < n && view[pos] != 44 && view[pos] != 13 && view[pos] != 10) { pos++; }
             }
             else {
-                returnValues[i] = "";
+                while (pos < n && view[pos] != 44 && view[pos] != 13 && view[pos] != 10) { v += String.fromCharCode(view[pos]); pos++; }
+                v = v.replace(/[ \t]+$/, "");
             }
+            // take the delimiter: a comma, or a line ending (CR LF or LF)
+            if (pos < n && view[pos] == 44) { pos++; }
+            else if (pos < n && view[pos] == 13) { pos++; if (pos < n && view[pos] == 10) { pos++; } }
+            else if (pos < n && view[pos] == 10) { pos++; }
+            returnValues[i] = v;
         }
+        fh.offset = pos;
     };
 
     this.func_InKey = function() {

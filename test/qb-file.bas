@@ -97,6 +97,37 @@ UT.AssertEquals st, ""
 Close #1
 Kill "test.txt"
 
+' INPUT # reads one field for each variable, from where the last one stopped
+Open "test.txt" For Output As #1
+Print #1, "one,2, three ,"; Chr$(34); "a, b"; Chr$(34)
+Print #1, "4"
+Print #1, "5,6"
+Print #1, "7"
+Print #1, "last line"
+Close #1
+Dim fa As String, fb As Integer, fc As String, fd As String, fe As Single, ff As Single
+Dim fg As Single, fh As Single, fl As String
+Open "test.txt" For Input As #1
+Input #1, fa
+UT.AssertEquals fa, "one"
+Input #1, fb, fc
+UT.AssertEquals fb, 2
+UT.AssertEquals fc, "three"
+Input #1, fd
+UT.AssertEquals fd, "a, b"
+Input #1, fe, ff, fg
+UT.AssertEquals fe, 4
+UT.AssertEquals ff, 5
+UT.AssertEquals fg, 6
+Input #1, fh
+UT.AssertEquals fh, 7
+' the line ending after the last item is taken, so the next line is read whole
+Line Input #1, fl
+UT.AssertEquals fl, "last line"
+UT.AssertTrue EOF(1)
+Close #1
+Kill "test.txt"
+
 MkDir "foo"
 UT.AssertTrue _DirExists("foo")
 UT.AssertTrue _DirExists("foo/")
