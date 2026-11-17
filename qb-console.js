@@ -294,6 +294,14 @@ function _QB() {
         }
     }
 
+    // NOT of a group in the compiler's own code: a comparison is a boolean, which gives 0 or -1
+    function not(value) {
+        if (typeof value == "boolean") {
+            return value ? 0 : -1;
+        }
+        return ~value;
+    }
+
     // integer assignment and integer parameters: the compiler's own code only needs QBJS's default rounding
     function roundInt(value) {
         return Math.round(value);
@@ -379,6 +387,7 @@ function _QB() {
         func_Mid: func_Mid,
         func_Right: func_Right,
         func__Round: func__Round,
+        not: not,
         roundInt: roundInt,
         func_Rnd: func_Rnd,
         func_RTrim: func_RTrim,

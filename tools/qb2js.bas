@@ -122,6 +122,13 @@ Dim Shared As Integer implicitVarLine
 Dim Shared As String condWords(4)
 Dim Shared As Integer forceSelfConvert
 Dim Shared As Integer optionRoundHalfEven
+' Parameters by reference, copy in and copy out. optionByRef is the compiler option; byRefMeta is set
+' for one module by its $BYREF ON line. byRefPre and byRefPost hold the code before and after a call
+' that ConvertMethodParamsRef wrote for the arguments it passes by reference.
+Dim Shared As Integer optionByRef
+Dim Shared As Integer byRefMeta
+Dim Shared As String byRefPre
+Dim Shared As String byRefPost
 Dim Shared As Integer optionExplicit
 Dim Shared As Integer optionExplicitArray
 ' DEFINT and the other DEF statements. Entry i covers the letters defFirst(i) to defLast(i) (1 to 26)
@@ -362,6 +369,7 @@ Sub Compile (source As String, moduleName As String, selfConvert)
         AddJSLine 0, "}"
         AddJSLine 0, "function setSelfConvert() { sub_SetSelfConvert(); }"
         AddJSLine 0, "function setRoundHalfEven() { sub_SetRoundHalfEven(); }"
+        AddJSLine 0, "function setByRef() { sub_SetByRef(); }"
         AddJSLine 0, ""
         AddJSLine 0, "return {"
         AddJSLine 0, "   compile: compile,"
@@ -373,6 +381,7 @@ Sub Compile (source As String, moduleName As String, selfConvert)
         AddJSLine 0, "   getModule: getModule,"
         AddJSLine 0, "   setSelfConvert: setSelfConvert,"
         AddJSLine 0, "   setRoundHalfEven: setRoundHalfEven,"
+        AddJSLine 0, "   setByRef: setByRef,"
         AddJSLine 0, "};"
         AddJSLine 0, "}"
         AddJSLine 0, "if (typeof module != 'undefined') { module.exports.QBCompiler = _QBCompiler; }"
@@ -392,6 +401,17 @@ End Sub
 Sub SetRoundHalfEven ()
     optionRoundHalfEven = True
 End Sub
+
+' The compiler option for passing a variable, an array element or a TYPE member to a procedure's
+' parameter by reference, as QB does, done as copy in and copy out. The $BYREF ON metacommand does
+' the same for the module it is in.
+Sub SetByRef ()
+    optionByRef = True
+End Sub
+
+Function ByRefEnabled
+    ByRefEnabled = optionByRef Or byRefMeta
+End Function
 
 Sub InitTypes
     Dim As Integer i, j, jsidx
@@ -440,6 +460,7 @@ Sub ResetDataStructures
     ReDim As Module modules(0)
     ReDim As Method exportMethods(0)
     ReDim As Variable exportConsts(0)
+    byRefMeta = False
     ReDim As Integer defLine(0)
     ReDim As Integer defFirst(0)
     ReDim As Integer defLast(0)
@@ -800,6 +821,13 @@ Sub ConvertLines (firstLine As Integer, lastLine As Integer, functionName As Str
 
             ElseIf first = "$NOPREFIX" Then
                 ' nothing to do here, keywords prefixes are optional
+
+            ElseIf first = "$BYREF" Then
+                ' $BYREF ON passes variables to procedures by reference (copy in, copy out). FindMethods
+                ' read it before any line was converted, so that it applies to the whole module.
+                second = ""
+                If UBound(parts) > 1 Then second = UCase$(String.Trim(parts(2)))
+                If second <> "ON" Then AddWarning i, "Expected $BYREF ON"
 
             ElseIf first = "$ROUNDING" Then
                 ' $ROUNDING EVEN rounds to the even number, as QB does; $ROUNDING UP (the default) rounds
@@ -1380,7 +1408,14 @@ Function ConvertSub$ (m As Method, args As String, lineNumber As Integer)
         js = CallMethod(m) + "(" + ConvertFullScreen(args) + ");"
 
     Else
-        js = CallMethod(m) + "(" + ConvertMethodParams(args, lineNumber) + ");"
+        If ByRefEnabled And IsOwnMethod(m) Then
+            Dim refParams As String
+            refParams = ConvertMethodParamsRef(m, args, lineNumber)
+            js = CallMethod(m) + "(" + refParams + ");"
+            If byRefPost <> "" Then js = "{ " + byRefPre + "try { " + js + " } finally { " + byRefPost + "} }"
+        Else
+            js = CallMethod(m) + "(" + ConvertMethodParams(args, lineNumber) + ");"
+        End If
     End If
 
     ConvertSub = js
@@ -2767,7 +2802,18 @@ Function ConvertExpression$ (ex As String, lineNumber As Integer)
                         js = js + fneg + "QB.arrayValue(" + bvar.jsname + ", [" + ConvertExpression(ex2, lineNumber) + "]).value"
                     End If
                 ElseIf FindMethod(word, m, "FUNCTION", True) Then
-                    js = js + fneg + "(" + CallMethod(m) + "(" + ConvertMethodParams(ex2, lineNumber) + "))"
+                    If ByRefEnabled And IsOwnMethod(m) Then
+                        Dim refParams As String
+                        refParams = ConvertMethodParamsRef(m, ex2, lineNumber)
+                        If byRefPost <> "" Then
+                            ' the call needs code before and after it, so it goes in a function of its own
+                            js = js + fneg + "(await (async () => { " + byRefPre + "try { return " + CallMethod(m) + "(" + refParams + "); } finally { " + byRefPost + "} })())"
+                        Else
+                            js = js + fneg + "(" + CallMethod(m) + "(" + refParams + "))"
+                        End If
+                    Else
+                        js = js + fneg + "(" + CallMethod(m) + "(" + ConvertMethodParams(ex2, lineNumber) + "))"
+                    End If
                 Else
                     varname = String.Trim(word)
                     If varname <> "" Then
@@ -2911,6 +2957,172 @@ Function ConvertMethodParams$ (args As String, lineNumber As Integer)
     ConvertMethodParams = js
 End Function
 
+' True for a SUB or FUNCTION written in the module being compiled. Built-in methods, library methods
+' (their names have a module prefix) and procedure parameters are not.
+Function IsOwnMethod (m As Method)
+    Dim found As Integer
+    found = False
+    If m.line = 0 Or InStr(m.jsname, ".") > 0 Then
+        IsOwnMethod = found
+        Exit Function
+    End If
+    Dim i As Integer
+    For i = 1 To UBound(methods)
+        If methods(i).line = m.line And methods(i).uname = m.uname And Not methods(i).builtin Then
+            found = True
+            Exit For
+        End If
+    Next i
+    IsOwnMethod = found
+End Function
+
+' True when the idx-th parameter of m is passed by reference. Arrays are already passed as objects, a
+' TYPE is an object and so is shared, and a procedure parameter is a function; the rest are copied.
+Function ParamRefEligible (m As Method, idx As Integer)
+    Dim ok As Integer
+    ok = False
+    If m.args = "" Then
+        ParamRefEligible = ok
+        Exit Function
+    End If
+    ReDim As String pargs(0)
+    ReDim As String pp(0)
+    Dim c As Integer
+    Dim v As Integer
+    c = Split(m.args, ",", pargs())
+    If idx >= 1 And idx <= c Then
+        v = Split(pargs(idx), ":", pp())
+        If pp(3) <> "true" Then
+            Dim t As String
+            t = NormalizeType(pp(2))
+            If t <> "FUNCTION" And t <> "SUB" And FindTypeId(t) < 1 Then ok = True
+        End If
+    End If
+    ParamRefEligible = ok
+End Function
+
+' True when an argument's text names something that can be assigned to: a variable, an array element or
+' a TYPE member, such as n, n$, a(i), p.x or a(i).x. A constant, an expression, an argument in its own
+' parentheses, a whole array (a()) and a function call are not.
+Function IsLvalueArg (text As String)
+    Dim ok As Integer
+    ok = False
+    text = String.Trim(text)
+    If text = "" Then
+        IsLvalueArg = ok
+        Exit Function
+    End If
+    Dim c As String
+    Dim startsWell As Integer
+    c = UCase$(Left$(text, 1))
+    startsWell = False
+    If c >= "A" And c <= "Z" Then startsWell = True
+    If c = "_" Then startsWell = True
+    If startsWell = False Then
+        IsLvalueArg = ok
+        Exit Function
+    End If
+
+    ' outside parentheses only name characters and dots are allowed
+    Dim depth As Integer, qmode As Integer, i As Integer
+    Dim baseEnd As Integer
+    baseEnd = 0
+    For i = 1 To Len(text)
+        c = Mid$(text, i, 1)
+        If c = Chr$(34) Then
+            qmode = Not qmode
+        ElseIf Not qmode Then
+            If c = "(" Then
+                If depth = 0 And baseEnd = 0 Then baseEnd = i
+                depth = depth + 1
+            ElseIf c = ")" Then
+                depth = depth - 1
+            ElseIf depth = 0 Then
+                If Not (InStr("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_.$%&!#`~", c) > 0) Then
+                    IsLvalueArg = ok
+                    Exit Function
+                End If
+                If c = "." And baseEnd = 0 Then baseEnd = i
+            End If
+        End If
+    Next i
+    If depth <> 0 Or qmode Then
+        IsLvalueArg = ok
+        Exit Function
+    End If
+    If String.EndsWith(text, "()") Then
+        IsLvalueArg = ok
+        Exit Function
+    End If
+
+    Dim baseName As String
+    Dim bvar As Variable
+    baseName = text
+    If baseEnd > 0 Then baseName = Left$(text, baseEnd - 1)
+    If baseEnd > 0 And Mid$(text, baseEnd, 1) = "(" Then
+        ' a(i) is an array element; f(x) is a function call
+        If FindVariable(baseName, bvar, True) Then ok = Not bvar.isConst
+    Else
+        If FindVariable(baseName, bvar, False) Then ok = Not bvar.isConst
+    End If
+    IsLvalueArg = ok
+End Function
+
+' Converts the arguments of a call to one of the module's own procedures. An argument that is a variable,
+' an array element or a TYPE member, and whose parameter is a plain value, is passed in a QB.Ref and the
+' value is copied back after the call. byRefPre then holds the code that makes the Refs, and byRefPost
+' the code that copies them back; both are empty when nothing is passed by reference.
+Function ConvertMethodParamsRef$ (m As Method, args As String, lineNumber As Integer)
+    Dim js As String
+    Dim pre As String
+    Dim post As String
+    ReDim params(0) As String
+    Dim argc As Integer
+    argc = ListSplit(args, params())
+    Dim i As Integer
+    For i = 1 To argc
+        If i > 1 Then js = js + ","
+        If String.Trim(params(i)) = "" Then
+            js = js + " undefined"
+        Else
+            Dim conv As String
+            conv = ConvertExpression(params(i), lineNumber)
+            Dim refd As Integer
+            refd = False
+            If ParamRefEligible(m, i) Then
+                If IsLvalueArg(params(i)) Then
+                    Dim target As String
+                    Dim dotPos As Integer
+                    Dim refName As String
+                    Dim objName As String
+                    target = RemoveSuffix(conv)
+                    refName = GenJSVar
+                    dotPos = _InStrRev(target, ".")
+                    If dotPos > 0 Then
+                        If InStr(Mid$(target, dotPos + 1), "(") = 0 And InStr(Mid$(target, dotPos + 1), "[") = 0 And InStr(Mid$(target, dotPos + 1), " ") = 0 Then
+                            ' evaluate the object (such as the array element) once, before the call
+                            objName = GenJSVar
+                            pre = pre + "var " + objName + " = " + Left$(target, dotPos - 1) + "; "
+                            pre = pre + "var " + refName + " = new QB.Ref(" + objName + Mid$(target, dotPos) + "); "
+                            post = post + objName + Mid$(target, dotPos) + " = " + refName + ".value; "
+                            refd = True
+                        End If
+                    Else
+                        pre = pre + "var " + refName + " = new QB.Ref(" + target + "); "
+                        post = post + target + " = " + refName + ".value; "
+                        refd = True
+                    End If
+                    If refd Then conv = " " + refName
+                End If
+            End If
+            js = js + " " + conv
+        End If
+    Next i
+    byRefPre = pre
+    byRefPost = post
+    ConvertMethodParamsRef = js
+End Function
+
 Function CallMethod$ (m As Method)
     Dim js As String
     If m.sync Then js = "await "
@@ -3037,6 +3249,11 @@ Sub ConvertMethods ()
             ReDim As Variable localVars(0)
             Dim intConv As String
             intConv = ""
+            ' with parameters by reference: take the value out of a QB.Ref on entry, copy it back on every way out
+            Dim refUnwrap As String
+            Dim refWriteBack As String
+            refUnwrap = ""
+            refWriteBack = ""
 
             ' All program methods are defined as async as we do not know whether
             ' a synchronous wait will occur downstream
@@ -3066,6 +3283,12 @@ Sub ConvertMethods ()
                     methodDec = methodDec + bvar.jsname + "/*" + parts(2) + "*/"
                     If a < c Then methodDec = methodDec + ","
 
+                    If ByRefEnabled And ParamRefEligible(methods(i), a) Then
+                        ' the argument is a QB.Ref when the caller passed a variable, and a plain value otherwise
+                        refUnwrap = refUnwrap + "var __r_" + bvar.jsname + " = null; if (" + bvar.jsname + " instanceof QB.Ref) { __r_" + bvar.jsname + " = " + bvar.jsname + "; " + bvar.jsname + " = " + bvar.jsname + ".value; } "
+                        refWriteBack = refWriteBack + "if (__r_" + bvar.jsname + ") { __r_" + bvar.jsname + ".value = " + bvar.jsname + "; } "
+                    End If
+
                     ' convert integer parameters from floating point (or string)
                     If Not bvar.isArray Then
                         Dim typeName As String
@@ -3093,7 +3316,7 @@ Sub ConvertMethods ()
             methodDec = methodDec + ") {"
 
             AddJSLine methods(i).line, methodDec
-            AddJSLine methods(i).line, "if (QB.halted()) { return; }; " + intConv
+            AddJSLine methods(i).line, "if (QB.halted()) { return; }; " + refUnwrap + intConv
             If methods(i).type = "FUNCTION" Then
                 AddJSLine methods(i).line, "var " + RemoveSuffix(methods(i).name) + " = null;"
                 Dim fvar As Variable
@@ -3102,12 +3325,13 @@ Sub ConvertMethods ()
                 AddVariable fvar, localVars()
             End If
             currentMethod = RemoveSuffix(methods(i).name)
-
+            If refWriteBack <> "" Then AddJSLine methods(i).line, "try {"
 
             ConvertLines methods(i).line + 1, lastLine - 1, methods(i).name
             If methods(i).type = "FUNCTION" Then
                 AddJSLine lastLine, "return " + RemoveSuffix(methods(i).name) + ";"
             End If
+            If refWriteBack <> "" Then AddJSLine lastLine, "} finally { " + refWriteBack + "}"
             AddJSLine lastLine, "}"
         End If
     Next i
@@ -3493,6 +3717,9 @@ Sub FindMethods
         If rawJS Then _Continue
 
         defCurLine = i
+        If word = "$BYREF" And pcount > 1 Then
+            If UCase$(parts(2)) = "ON" Then byRefMeta = True
+        End If
         If word = "DEFINT" Or word = "DEFLNG" Or word = "DEFSNG" Or word = "DEFDBL" Or word = "DEFSTR" Or word = "_DEFINE" Then
             RegisterDefType i, word, Join(parts(), 2, -1, " ")
         End If

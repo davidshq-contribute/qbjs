@@ -16,6 +16,9 @@ async function compile(src) {
         if (process.argv.includes("--round-half-even")) {
             qbc.setRoundHalfEven();
         }
+        if (process.argv.includes("--byref")) {
+            qbc.setByRef();
+        }
         result = "async function __qbjs_run() {\n" + await qbc.compile(data) + "\n}";
     }
     fs.writeFileSync(process.argv[3], result, "utf8");

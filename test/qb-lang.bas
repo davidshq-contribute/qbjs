@@ -71,6 +71,13 @@ UT.AssertEquals Peek(100), 7
 Def Seg
 UT.AssertEquals Peek(100), 65
 
+' By default a procedure gets a copy of its arguments: a change to the parameter is not seen by the caller.
+' ($BYREF ON, tested in qb-byref.bas, gives QB's by-reference behavior.)
+Dim offA As Integer
+offA = 4
+OffBump offA
+UT.AssertEquals offA, 4
+
 ' Rounding into an integer: QBJS rounds a half up (2.5 to 3); $ROUNDING EVEN rounds it to the even
 ' number as QB does (2.5 to 2, 3.5 to 4, -2.5 to -2, -3.5 to -4). CINT is always QB's.
 Dim rndA%, rndB&
@@ -135,6 +142,10 @@ UT.AssertEquals bAddOne(1.4), 1
 UT.AssertEquals dtTwice(2.6), 5.2
 
 Console.Echo "QB Language - tests completed with no errors* in " + (Sys.TimeInMillis - ts) + " millisecond(s)"
+
+Sub OffBump (n As Integer)
+    n = n + 1
+End Sub
 
 Function rndHalf (n As Integer)
     rndHalf = n

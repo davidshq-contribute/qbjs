@@ -329,6 +329,13 @@ var QB = new function() {
     };
 
     // Data type conversions
+    // A variable, array element or TYPE member that a call passes by reference (copy in, copy out): the
+    // caller puts its value in a Ref, the procedure reads and writes the Ref's value, and the caller copies
+    // the value back after the call.
+    this.Ref = function(value) {
+        this.value = value;
+    };
+
     this.toInteger = function(value) {
         if (_roundHalfEven) {
             // like QB, INPUT into an integer rounds the number it reads
