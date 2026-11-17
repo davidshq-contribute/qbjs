@@ -370,13 +370,21 @@ var QB = new function() {
         _qbLines = !!on;
     };
 
+    // A comparison stored in an integer gives JavaScript's 1 for true. setQBBooleans(true), which the
+    // booleans setting ($BOOLEANS QB or --qb-booleans) turns on, gives QB's -1 instead.
+    var _qbBooleans = false;
+
+    this.setQBBooleans = function(on) {
+        _qbBooleans = !!on;
+    };
+
     // roundLong is for a LONG or a wider integer, roundInt for an INTEGER, a _BYTE or a _BIT. QB64 rounds a
     // value for an integer of 16 bits or less as a single (798.50001 is 798.5, and 798), and for a wider
     // one as the double it is (799), so with setRoundHalfEven(true) roundInt does the same.
     this.roundLong = function(value) {
-        // a comparison gives a JavaScript boolean; QB's true is -1, so that NOT gives 0 for it
+        // a comparison gives a JavaScript boolean: 1 for true, or QB's -1 with setQBBooleans(true)
         if (typeof value == "boolean") {
-            return value ? -1 : 0;
+            return value ? (_qbBooleans ? -1 : 1) : 0;
         }
         var r = Math.round(value);
         if (_roundHalfEven && Math.abs(value % 1) === 0.5 && r % 2 !== 0) {
@@ -465,10 +473,11 @@ var QB = new function() {
         _fonts[16] = { name: "dosvga", size: "16px", style: "", offset: 4, monospace: true, height: 16, width: 8 };
         GX.vfsCwd(GX.vfs().rootDirectory());
         _fileHandles = {};
-        // a run starts with QBJS's rounding and lines, no view port and an empty PEEK and POKE memory
+        // a run starts with QBJS's rounding, lines and booleans, no view port and an empty PEEK and POKE memory
         _roundHalfEven = false;
         _qbLines = false;
         _lineWidthSet = false;
+        _qbBooleans = false;
         _viewport = undefined;
         _defSeg = 0;
         _peekPokeMemory = {};

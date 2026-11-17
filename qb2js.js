@@ -1119,6 +1119,9 @@ if (QB.halted()) { return; };
    if (~ selfConvert &  moduleName ==  ""  &  optionQBLines) {
       await sub_AddJSLine(  0,   "QB.setQBLines(true);");
    }
+   if (~ selfConvert &  moduleName ==  ""  &  optionQBBooleans) {
+      await sub_AddJSLine(  0,   "QB.setQBBooleans(true);");
+   }
    if (~ selfConvert &  moduleName ==  "" ) {
       var mtest = {line:0,lastLine:0,type:'',returnType:'',name:'',uname:'',argc:0,args:'',jsname:'',sync:0,builtin:0,dynamic:0};  /* METHOD */ 
       if ((await func_FindMethod( "GXOnGameEvent" ,    mtest,   "SUB" ,    True)) ) {
@@ -1700,6 +1703,9 @@ if (QB.halted()) { return; }; firstLine = QB.roundInt(firstLine); lastLine = QB.
             }
             if ( second !=  "QB" ) {
                await sub_AddWarning(  i,   "Expected $BOOLEANS QB");
+            }
+            if ( second ==  "QB" ) {
+               js = "QB.setQBBooleans(true);";
             }
          } else if ( first ==  "$LINES" ) {
             second = "";
