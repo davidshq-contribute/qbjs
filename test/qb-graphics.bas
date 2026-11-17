@@ -125,4 +125,60 @@ View
 UT.AssertEquals Point(120, 100), green
 UT.AssertEquals Point(20, 0), black
 
+' By default DRAW strokes its lines on the canvas, two pixels wide
+Dim white As Unsigned Long, fill As Unsigned Long
+Cls 0
+PSet (630, 470), 15
+white = Point(630, 470)
+PSet (20, 30), 0
+Draw "C15R10"
+UT.AssertTrue Point(25, 29) <> black
+
+' With $LINES QB, DRAW sets whole pixels, one wide, so PAINT finds its border. The pen keeps its
+' fractions and POINT(0) and POINT(1) round it. N draws without moving the pen; CLS sets the scale back
+' to S4; A0 turns back to no rotation. QB64pe gives the same results.
+$Lines QB
+Cls 0
+PSet (20, 30), 0
+Draw "C15R10"
+UT.AssertEquals Point(30, 30), white
+UT.AssertEquals Point(31, 30), black
+UT.AssertEquals Point(25, 29), black
+UT.AssertEquals Point(25, 31), black
+PSet (20, 40), 0
+Draw "S2R3"
+UT.AssertEquals Point(0), 22
+UT.AssertEquals Point(2), 21.5
+Draw "S4"
+PSet (20, 50), 0
+Draw "C15NR10D5"
+UT.AssertEquals Point(0), 20
+UT.AssertEquals Point(1), 55
+UT.AssertEquals Point(30, 50), white
+Draw "S8"
+Cls 0
+PSet (20, 20), 0
+Draw "R5"
+UT.AssertEquals Point(0), 25
+Draw "TA90A0R5"
+UT.AssertEquals Point(0), 30
+UT.AssertEquals Point(1), 20
+PSet (100, 100), 0
+Draw "C15R10D10L10U10BF5P9,15"
+fill = Point(105, 105)
+UT.AssertTrue fill <> black
+UT.AssertTrue fill <> white
+UT.AssertEquals Point(101, 109), fill
+UT.AssertEquals Point(111, 105), black
+UT.AssertEquals Point(99, 105), black
+' a program that sets a line width (LineWidth of the Graphics 2D library) keeps the canvas strokes
+$If Javascript Then
+    QB.defaultLineWidth(2);
+$End If
+Cls 0
+PSet (20, 30), 0
+Draw "C15R10"
+UT.AssertTrue Point(25, 29) <> black
+$Lines Smooth
+
 Console.Echo "QB Graphics - tests completed with no errors* in " + (Sys.TimeInMillis - ts) + " millisecond(s)"

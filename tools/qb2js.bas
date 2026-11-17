@@ -122,6 +122,7 @@ Dim Shared As Integer implicitVarLine
 Dim Shared As String condWords(4)
 Dim Shared As Integer forceSelfConvert
 Dim Shared As Integer optionRoundHalfEven
+Dim Shared As Integer optionQBLines
 ' Parameters by reference, copy in and copy out. optionByRef is the compiler option; byRefMeta is set
 ' for one module by its $BYREF ON line. byRefPre and byRefPost hold the code before and after a call
 ' that ConvertMethodParamsRef wrote for the arguments it passes by reference.
@@ -262,6 +263,7 @@ Sub Compile (source As String, moduleName As String, selfConvert)
 
     If Not selfConvert And moduleName = "" Then AddJSLine 0, "QB.start();"
     If Not selfConvert And moduleName = "" And optionRoundHalfEven Then AddJSLine 0, "QB.setRoundHalfEven(true);"
+    If Not selfConvert And moduleName = "" And optionQBLines Then AddJSLine 0, "QB.setQBLines(true);"
 
     If Not selfConvert And moduleName = "" Then
         Dim mtest As Method
@@ -375,6 +377,7 @@ Sub Compile (source As String, moduleName As String, selfConvert)
         AddJSLine 0, "function setRoundHalfEven() { sub_SetRoundHalfEven(); }"
         AddJSLine 0, "function setByRef() { sub_SetByRef(); }"
         AddJSLine 0, "function setQBBooleans() { sub_SetQBBooleans(); }"
+        AddJSLine 0, "function setQBLines() { sub_SetQBLines(); }"
         AddJSLine 0, ""
         AddJSLine 0, "return {"
         AddJSLine 0, "   compile: compile,"
@@ -388,6 +391,7 @@ Sub Compile (source As String, moduleName As String, selfConvert)
         AddJSLine 0, "   setRoundHalfEven: setRoundHalfEven,"
         AddJSLine 0, "   setByRef: setByRef,"
         AddJSLine 0, "   setQBBooleans: setQBBooleans,"
+        AddJSLine 0, "   setQBLines: setQBLines,"
         AddJSLine 0, "};"
         AddJSLine 0, "}"
         AddJSLine 0, "if (typeof module != 'undefined') { module.exports.QBCompiler = _QBCompiler; }"
@@ -406,6 +410,12 @@ End Sub
 ' does the same from inside a program.
 Sub SetRoundHalfEven ()
     optionRoundHalfEven = True
+End Sub
+
+' The compiler option for lines of whole pixels, one wide, as QB draws them, instead of QBJS's smoothed
+' canvas strokes. So far DRAW follows it. The $LINES QB metacommand does the same from inside a program.
+Sub SetQBLines ()
+    optionQBLines = True
 End Sub
 
 ' The compiler option for passing a variable, an array element or a TYPE member to a procedure's
@@ -856,6 +866,19 @@ Sub ConvertLines (firstLine As Integer, lastLine As Integer, functionName As Str
                 second = ""
                 If UBound(parts) > 1 Then second = UCase$(String.Trim(parts(2)))
                 If second <> "QB" Then AddWarning i, "Expected $BOOLEANS QB"
+
+            ElseIf first = "$LINES" Then
+                ' $LINES QB draws lines of whole pixels, as QB does; $LINES SMOOTH (the default) strokes
+                ' them on the canvas. QB64pe does not know it, so it goes inside $IF WEB THEN ... $END IF.
+                second = ""
+                If UBound(parts) > 1 Then second = UCase$(String.Trim(parts(2)))
+                If second = "QB" Then
+                    js = "QB.setQBLines(true);"
+                ElseIf second = "SMOOTH" Then
+                    js = "QB.setQBLines(false);"
+                Else
+                    AddWarning i, "Expected $LINES QB or $LINES SMOOTH"
+                End If
 
             ElseIf first = "$ROUNDING" Then
                 ' $ROUNDING EVEN rounds to the even number, as QB does; $ROUNDING UP (the default) rounds

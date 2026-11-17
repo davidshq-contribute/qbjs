@@ -359,6 +359,17 @@ var QB = new function() {
         _roundHalfEven = !!on;
     };
 
+    // QBJS strokes its lines on the canvas, which smooths them and makes them two pixels wide.
+    // setQBLines(true) makes DRAW set whole pixels, one wide, as QB does, so that PAINT finds a
+    // border drawn by DRAW. It is off by default, and a program that sets a line width (LineWidth of
+    // the Graphics 2D library) keeps the canvas strokes.
+    var _qbLines = false;
+    var _lineWidthSet = false;
+
+    this.setQBLines = function(on) {
+        _qbLines = !!on;
+    };
+
     // roundLong is for a LONG or a wider integer, roundInt for an INTEGER, a _BYTE or a _BIT. QB64 rounds a
     // value for an integer of 16 bits or less as a single (798.50001 is 798.5, and 798), and for a wider
     // one as the double it is (799), so with setRoundHalfEven(true) roundInt does the same.
@@ -444,8 +455,10 @@ var QB = new function() {
         _fonts[16] = { name: "dosvga", size: "16px", style: "", offset: 4, monospace: true, height: 16, width: 8 };
         GX.vfsCwd(GX.vfs().rootDirectory());
         _fileHandles = {};
-        // a run starts with QBJS's rounding, no view port and an empty PEEK and POKE memory
+        // a run starts with QBJS's rounding and lines, no view port and an empty PEEK and POKE memory
         _roundHalfEven = false;
+        _qbLines = false;
+        _lineWidthSet = false;
         _viewport = undefined;
         _defSeg = 0;
         _peekPokeMemory = {};
@@ -484,6 +497,7 @@ var QB = new function() {
     this.defaultLineWidth = function(width) {
         if (width != undefined) {
             _strokeLineThickness = width;
+            _lineWidthSet = true;
         }
         return _strokeLineThickness;
     };
@@ -1806,6 +1820,9 @@ var QB = new function() {
 
         ctx = _images[_activeImage].ctx;
         _flushScreenCache(_images[_activeImage]);
+        // as in QB64, every CLS sets DRAW's angle and scale back to TA0 and S4
+        _strokeDrawLength = 4;
+        _strokeDrawAngle = -Math.PI/2;
         if (_viewport != undefined && (method == undefined || method == 1)) {
             var vx = _viewport.x1, vy = _viewport.y1;
             var vw = _viewport.x2 - _viewport.x1 + 1, vh = _viewport.y2 - _viewport.y1 + 1;
@@ -1947,7 +1964,6 @@ var QB = new function() {
 
         // Draw-specific variables.
         var cursX, cursY;
-        var cursX0, cursY0;
         var cursXt, cursYt;
         var ang, ux, uy, ux0, uy0, vx, vy, wx, wy, dlen;
         var sMFlag;
@@ -1968,10 +1984,31 @@ var QB = new function() {
         // Screen variables.
         _flushScreenCache(_images[_activeImage]);
         var screen = _images[_activeImage];
-        var ctx = screen.ctx;
 
         cursX = screen.lastX;
         cursY = screen.lastY;
+
+        // With setQBLines(true), as in QB64, a line is set pixel by pixel between the pen's two positions
+        // rounded, while the pen itself keeps its fractions. Otherwise it is stroked on the canvas. DRAW's
+        // coordinates are relative to the view port's corner.
+        var origin = _viewOrigin();
+        var ctx = screen.ctx;
+        function _drawLine(x1, y1, x2, y2) {
+            if (_qbLines && !_lineWidthSet) {
+                _pixelLine(screen, QB.roundLong(x1) + origin.x, QB.roundLong(y1) + origin.y,
+                    QB.roundLong(x2) + origin.x, QB.roundLong(y2) + origin.y, _color(_strokeDrawColor));
+                return;
+            }
+            _flushScreenCache(screen);
+            ctx.lineWidth = _strokeLineThickness;
+            ctx.strokeStyle = _color(_strokeDrawColor).rgba();
+            _viewBegin(ctx);
+            ctx.beginPath();
+            ctx.moveTo(x1, y1);
+            ctx.lineTo(x2, y2);
+            ctx.stroke();
+            _viewEnd(ctx);
+        }
 
         // Main loop.
         while (v.length) {
@@ -1982,8 +2019,7 @@ var QB = new function() {
                     cursSkipdraw = true;
 
                 } else if (tok[0] == "N") {
-                    cursX0 = cursX;
-                    cursY0 = cursY;
+                    // the next move draws but leaves the pen where it was
                     cursReturn = true;
 
                 } else if (tok[0] == "C") {
@@ -2007,7 +2043,9 @@ var QB = new function() {
                 } else if (tok[0] == "A") {
                     tok1 = v.shift();
                     if (tok1[1] == 0) {
-                        if (tok1[0] == 1) {
+                        if (tok1[0] == 0) {
+                            _strokeDrawAngle = -Math.PI/2;
+                        } else if (tok1[0] == 1) {
                             _strokeDrawAngle = -Math.PI;
                         } else if (tok1[0] == 2) {
                             _strokeDrawAngle = -Math.PI*(3/2);
@@ -2125,19 +2163,16 @@ var QB = new function() {
                         cursXt = ux0 + wx;
                         cursYt = uy0 + wy;
                         if (cursSkipdraw == false) {
-                            ctx.lineWidth = _strokeLineThickness;
-                            ctx.strokeStyle = _color(_strokeDrawColor).rgba();
-                            _viewBegin(ctx);
-                            ctx.beginPath();
-                            ctx.moveTo(cursX, cursY);
-                            ctx.lineTo(cursXt, cursYt);
-                            ctx.stroke();
-                            _viewEnd(ctx);
+                            _drawLine(cursX, cursY, cursXt, cursYt);
                         } else {
                             cursSkipdraw = false;
                         }
-                        cursX = cursXt;
-                        cursY = cursYt;
+                        if (cursReturn) {
+                            cursReturn = false;
+                        } else {
+                            cursX = cursXt;
+                            cursY = cursYt;
+                        }
                     }
 
                 } else if (tok[0] == "P") {
@@ -2179,28 +2214,20 @@ var QB = new function() {
                             cursXt = (cursX)*1.0 + ux;
                             cursYt = (cursY)*1.0 + uy;
                             if (cursSkipdraw == false) {
-                                ctx.lineWidth = _strokeLineThickness;
-                                ctx.strokeStyle = _color(_strokeDrawColor).rgba();
-                                _viewBegin(ctx);
-                                ctx.beginPath();
-                                ctx.moveTo(cursX, cursY);
-                                ctx.lineTo(cursXt, cursYt);
-                                ctx.stroke();
-                                _viewEnd(ctx);
+                                _drawLine(cursX, cursY, cursXt, cursYt);
                             } else {
                                 cursSkipdraw = false;
                             }
-                            cursX = cursXt;
-                            cursY = cursYt;
+                            if (cursReturn) {
+                                cursReturn = false;
+                            } else {
+                                cursX = cursXt;
+                                cursY = cursYt;
+                            }
                         }
                     }
                 }     
             }
-            if (cursReturn == true) {
-                cursX = cursX0;
-                cursY = cursY0;
-                cursReturn = false;
-            } 
         }
         screen.lastX = cursX;
         screen.lastY = cursY;
@@ -3137,10 +3164,11 @@ var QB = new function() {
         var screen = _images[_sourceImage];
         var ret = 0;
         if (y == undefined) {
+            // as in QB64, POINT(0) and POINT(1) give the graphics cursor rounded; DRAW can leave it between pixels
             if (x == 0) {
-                ret = screen.lastX;
+                ret = this.roundLong(screen.lastX);
             } else if (x == 1) {
-                ret = screen.lastY;           
+                ret = this.roundLong(screen.lastY);
             } else if (x == 2) {
                 if (_windowAspect[0] != false) {
                     ret = windowUnContendX(screen.lastX, screen.canvas.width);
@@ -3637,6 +3665,54 @@ var QB = new function() {
         screen.imgdata.data[pixelIndex + 2] = color.b;
         screen.imgdata.data[pixelIndex + 3] = color.a * 255;
     };
+
+    // Sets the pixels of a line from (x1, y1) to (x2, y2), whole screen pixels, as QB64 draws DRAW's lines:
+    // it steps along the longer axis and rounds the other, kept as a single, half away from zero. Pixels
+    // outside the screen or the view port are skipped.
+    function _pixelLine(screen, x1, y1, x2, y2, color) {
+        if (!screen.cached) {
+            screen.imgdata = screen.ctx.getImageData(0, 0, screen.canvas.width, screen.canvas.height);
+            screen.cached = true;
+        }
+        var dx = Math.abs(x2 - x1), dy = Math.abs(y2 - y1);
+        var n = Math.max(dx, dy);
+        var step = 0, dir = 1, f, i;
+        if (dx > dy) {
+            f = y1;
+            if (dx) {
+                step = Math.fround((y2 - y1) / dx);
+                dir = (x2 >= x1) ? 1 : -1;
+            }
+        } else {
+            f = x1;
+            if (dy) {
+                step = Math.fround((x2 - x1) / dy);
+                dir = (y2 >= y1) ? 1 : -1;
+            }
+        }
+        for (i = 0; i <= n; i++) {
+            var r = Math.trunc(Math.fround(f < 0 ? f - 0.5 : f + 0.5));
+            if (dx > dy) {
+                _setPixel(screen, x1, r, color);
+                x1 += dir;
+            } else {
+                _setPixel(screen, r, y1, color);
+                y1 += dir;
+            }
+            f = Math.fround(f + step);
+        }
+    }
+
+    function _setPixel(screen, x, y, color) {
+        if (x < 0 || y < 0 || x >= screen.canvas.width || y >= screen.canvas.height || !_inViewport(x, y)) {
+            return;
+        }
+        var pixelIndex = (y * screen.canvas.width + x) * 4;
+        screen.imgdata.data[pixelIndex] = color.r;
+        screen.imgdata.data[pixelIndex + 1] = color.g;
+        screen.imgdata.data[pixelIndex + 2] = color.b;
+        screen.imgdata.data[pixelIndex + 3] = color.a * 255;
+    }
 
     function _flushScreenCache(screen) {
         if (screen.cached) {
@@ -4440,6 +4516,9 @@ var QB = new function() {
     // still maps to the whole screen, not to the port.
     this.sub_View = function(sstep, sx, sy, estep, ex, ey, fillColor, borderColor, screenSwitch) {
         var screen = _images[_activeImage];
+        // as in QB64, VIEW sets DRAW's angle and scale back to TA0 and S4
+        _strokeDrawLength = 4;
+        _strokeDrawAngle = -Math.PI/2;
         if (sx == undefined || sy == undefined || ex == undefined || ey == undefined) {
             _viewport = undefined;
             return;
