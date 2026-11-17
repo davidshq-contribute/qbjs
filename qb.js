@@ -382,6 +382,16 @@ var QB = new function() {
         return QB.roundLong(value);
     };
 
+    // MOD. With setRoundHalfEven(true) both operands are rounded to integers first, as QB does
+    // (7.5 MOD 2 is 8 MOD 2, which is 0; 6.5 MOD 4 is 6 MOD 4, which is 2).
+    this.mod = function(a, b) {
+        if (_roundHalfEven) {
+            a = QB.roundLong(a);
+            b = QB.roundLong(b);
+        }
+        return a % b;
+    };
+
     this.toFloat = function(value) {
         var result = parseFloat(value);
         if (isNaN(result)) {

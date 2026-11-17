@@ -1907,8 +1907,16 @@ Function ConvertRead$ (m As Method, args As String, lineNumber As Integer)
     vname = GenJSVar
     js = "var " + vname + " = new Array(" + Str$(UBound(vars)) + "); " '+ LF
     js = js + CallMethod(m) + "(" + vname + "); " '+ LF
+    Dim target As String
     For i = 1 To UBound(vars)
-        js = js + ConvertExpression(vars(i), lineNumber) + " = " + vname + "[" + Str$(i - 1) + "]; " '+ LF
+        ' converted first, so that a variable first used here is declared before its type is asked for
+        target = ConvertExpression(vars(i), lineNumber)
+        If IsIntegerVar(vars(i)) Then
+            ' QB64 rounds the number read as the double it is (798.5000000000001 is 799 in an INTEGER and a LONG)
+            js = js + target + " = QB.roundLong(" + vname + "[" + Str$(i - 1) + "]); "
+        Else
+            js = js + target + " = " + vname + "[" + Str$(i - 1) + "]; " '+ LF
+        End If
     Next i
     ConvertRead$ = js
 End Function
@@ -2740,6 +2748,7 @@ Function ConvertExpression$ (ex As String, lineNumber As Integer)
     Dim bvar As Variable
     Dim m As Method
     Dim intdiv As Integer
+    Dim hasMod As Integer
     ' $BOOLEANS QB: the stretch of the expression since the last logical operator or comma starts at
     ' segStart in js, and segCmp says whether it holds a comparison. A comparison binds more loosely than
     ' arithmetic and more tightly than NOT, AND, OR and XOR, so such a stretch is the comparison with its
@@ -2787,7 +2796,8 @@ Function ConvertExpression$ (ex As String, lineNumber As Integer)
                 ElseIf uword = "ORELSE" Or uword = "_ORELSE" Then
                     js = js + " || "
                 ElseIf uword = "MOD" Then
-                    js = js + " % "
+                    js = js + " " + Chr$(3) + " " ' a mark, which ConvertMod turns into QB.mod(left, right) at the end
+                    hasMod = True
                 ElseIf uword = "XOR" Then
                     js = js + " ^ "
                 ElseIf uword = "EQV" Then
@@ -2977,6 +2987,9 @@ Function ConvertExpression$ (ex As String, lineNumber As Integer)
     If intdiv Then
         js = ConvertIntDiv(js)
     End If
+    If hasMod Then
+        js = ConvertMod(js)
+    End If
     If booleans Then
         ' The marks of CloseCompare, each a word of its own, so that ConvertIntDiv passed over them
         js = String.Replace(js, " " + Chr$(1) + " ", " QB.toBoolean(")
@@ -3073,6 +3086,96 @@ Function ConvertIntDiv$ (s As String)
     Wend
     
     ConvertIntDiv = s
+End Function
+
+' MOD. ConvertExpression marks each MOD with Chr$(3), and this turns "a <mark> b" into "QB.mod(a, b)", from
+' the leftmost mark on, since MOD groups from the left. MOD binds more loosely than ^, *, / and \ and more
+' tightly than + and -, so each operand runs over those, up to a + or - that is not a sign, a comparison, a
+' logical operator, a comma or the edge of a group. So 10 MOD 3 * 2 is 10 MOD 6, as in QB. (A number such as
+' 1E+1 is already split into 1E + 1 before this, so it is not handled here.)
+Function ConvertMod$ (s As String)
+    Dim As Integer idx, sidx, eidx
+    idx = InStr(s, Chr$(3))
+    While idx > 0
+        sidx = ModOperandStart(s, idx)
+        eidx = ModOperandEnd(s, idx)
+        s = Left$(s, sidx - 1) + " QB.mod(" + Mid$(s, sidx, idx - sidx) + "," + Mid$(s, idx + 1, eidx - idx) + ") " + Mid$(s, eidx + 1)
+        idx = InStr(s, Chr$(3))
+    Wend
+    ConvertMod = s
+End Function
+
+' Where the left operand of the MOD mark at idx starts
+Function ModOperandStart (s As String, idx As Integer)
+    Dim As Integer i, depth
+    Dim As String c, q
+    For i = idx - 1 To 1 Step -1
+        c = Mid$(s, i, 1)
+        If q <> "" Then
+            If c = q Then q = ""
+        ElseIf c = Chr$(34) Or c = "'" Then
+            q = c
+        ElseIf c = ")" Or c = "]" Then
+            depth = depth + 1
+        ElseIf c = "(" Or c = "[" Then
+            If depth = 0 Then Exit For
+            depth = depth - 1
+        ElseIf depth = 0 Then
+            If IsModOperandEnd(c) Then Exit For
+            If (c = "+" Or c = "-") AndAlso IsBinarySign(s, i) Then Exit For
+        End If
+    Next i
+    ModOperandStart = i + 1
+End Function
+
+' Where the right operand of the MOD mark at idx ends
+Function ModOperandEnd (s As String, idx As Integer)
+    Dim As Integer i, depth
+    Dim As String c, q
+    For i = idx + 1 To Len(s)
+        c = Mid$(s, i, 1)
+        If q <> "" Then
+            If c = q Then q = ""
+        ElseIf c = Chr$(34) Or c = "'" Then
+            q = c
+        ElseIf c = "(" Or c = "[" Then
+            depth = depth + 1
+        ElseIf c = ")" Or c = "]" Then
+            If depth = 0 Then Exit For
+            depth = depth - 1
+        ElseIf depth = 0 Then
+            If IsModOperandEnd(c) Then Exit For
+            If (c = "+" Or c = "-") AndAlso IsBinarySign(s, i) Then Exit For
+        End If
+    Next i
+    ModOperandEnd = i - 1
+End Function
+
+' A character of the converted expression that ends an operand of MOD: a comma, a comparison, a logical
+' operator, another MOD mark, or a mark of $BOOLEANS QB
+Function IsModOperandEnd (c As String)
+    IsModOperandEnd = (c = "," Or c = "=" Or c = "<" Or c = ">" Or c = "!" Or c = "&" Or c = "|" Or _
+        c = "^" Or c = "~" Or c = "?" Or c = ":" Or c = ";" Or c = Chr$(1) Or c = Chr$(2) Or c = Chr$(3))
+End Function
+
+' Whether the + or - at i of s is an operator between two operands, not a sign (-b, a * -b): the nearest
+' character before it that is not a space ends an operand. (No Not here: this compiler is built without
+' $BOOLEANS QB, where Not of comparisons joined by Or is always true.)
+Function IsBinarySign (s As String, i As Integer)
+    Dim j As Integer
+    Dim c As String
+    IsBinarySign = False
+    j = i - 1
+    While j > 0 AndAlso Mid$(s, j, 1) = " "
+        j = j - 1
+    Wend
+    If j > 0 Then
+        c = UCase$(Mid$(s, j, 1))
+        If (c >= "A" AndAlso c <= "Z") OrElse (c >= "0" AndAlso c <= "9") OrElse c = "_" OrElse c = "$" OrElse _
+           c = "." OrElse c = ")" OrElse c = "]" OrElse c = Chr$(34) OrElse c = "'" Then
+            IsBinarySign = True
+        End If
+    End If
 End Function
 
 
