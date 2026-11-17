@@ -68,4 +68,61 @@ UT.AssertEquals Point(335, 335), _RGB32(0, 0, 0)
 Put (300, 300), saved()
 UT.AssertEquals Point(335, 335), yellow
 
+' Inside a view port, coordinates are relative to its corner, drawing is clipped to it, and POINT outside
+' it is -1. CLS 1 sends the text cursor home and the graphics cursor to the port's center. QB64pe gives
+' the same results.
+Screen 12
+Dim black As Unsigned Long, lineColor As Unsigned Long, blue As Unsigned Long
+black = _RGB32(0, 0, 0)
+Cls 0
+Locate 10, 20: Print "x";
+View (100, 100)-(300, 200)
+Cls 1
+UT.AssertEquals Csrlin, 1
+UT.AssertEquals Pos(0), 1
+UT.AssertEquals Point(0), 100
+UT.AssertEquals Point(1), 50
+PSet (0, 0), 14
+yellow = Point(0, 0)
+UT.AssertTrue yellow <> black
+UT.AssertEquals Point(0), 0
+UT.AssertEquals Point(-1, -1), -1
+UT.AssertEquals Point(250, 50), -1
+Line (-50, 50)-(400, 50), 15
+View
+UT.AssertEquals Point(100, 100), yellow
+UT.AssertEquals Point(99, 99), black
+lineColor = Point(100, 150)
+UT.AssertTrue lineColor <> black
+UT.AssertEquals Point(300, 150), lineColor
+UT.AssertEquals Point(99, 150), black
+UT.AssertEquals Point(301, 150), black
+Cls 0
+' PAINT stops at the view port's edge
+View (100, 100)-(300, 200)
+Paint (10, 10), 9
+View
+blue = Point(100, 100)
+UT.AssertTrue blue <> black
+UT.AssertEquals Point(300, 200), blue
+UT.AssertEquals Point(99, 100), black
+UT.AssertEquals Point(301, 200), black
+Cls 0
+' VIEW SCREEN keeps the screen's coordinates and clips
+View Screen (100, 100)-(300, 200)
+PSet (150, 150), 14
+PSet (50, 50), 14
+View
+UT.AssertEquals Point(150, 150), yellow
+UT.AssertEquals Point(50, 50), black
+Cls 0
+' graphics GET and PUT are relative to the corner too
+View (100, 100)-(300, 200)
+Line (0, 0)-(9, 9), 2, BF
+Get (0, 0)-(9, 9), saved()
+Put (20, 0), saved(), PSet
+View
+UT.AssertEquals Point(120, 100), green
+UT.AssertEquals Point(20, 0), black
+
 Console.Echo "QB Graphics - tests completed with no errors* in " + (Sys.TimeInMillis - ts) + " millisecond(s)"

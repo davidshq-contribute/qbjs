@@ -250,7 +250,6 @@ var QB = new function() {
     var _windowAspect = [];
     var _windowDef = [];
     var _viewport = undefined;
-    var _viewportWarned = false;
     var _fileHandles = {};
     var _typeMap = {};
     var _ucharMap = {};
@@ -448,7 +447,6 @@ var QB = new function() {
         // a run starts with QBJS's rounding, no view port and an empty PEEK and POKE memory
         _roundHalfEven = false;
         _viewport = undefined;
-        _viewportWarned = false;
         _defSeg = 0;
         _peekPokeMemory = {};
         _initColorTable();
@@ -1814,6 +1812,13 @@ var QB = new function() {
             ctx.clearRect(vx, vy, vw, vh);
             ctx.fillStyle = color.rgba();
             ctx.fillRect(vx, vy, vw, vh);
+            // as in QB64: the text cursor goes home, and the graphics cursor to the port's center
+            var origin = _viewOrigin();
+            _images[_activeImage].lastX = vx - origin.x + Math.floor((vw - 1) / 2);
+            _images[_activeImage].lastY = vy - origin.y + Math.floor((vh - 1) / 2);
+            _locX = 0;
+            _lastTextX = 0;
+            _locY = 0;
             return;
         }
         ctx.clearRect(0, 0, _width(), _height());
@@ -2122,10 +2127,12 @@ var QB = new function() {
                         if (cursSkipdraw == false) {
                             ctx.lineWidth = _strokeLineThickness;
                             ctx.strokeStyle = _color(_strokeDrawColor).rgba();
+                            _viewBegin(ctx);
                             ctx.beginPath();
                             ctx.moveTo(cursX, cursY);
                             ctx.lineTo(cursXt, cursYt);
                             ctx.stroke();
+                            _viewEnd(ctx);
                         } else {
                             cursSkipdraw = false;
                         }
@@ -2174,10 +2181,12 @@ var QB = new function() {
                             if (cursSkipdraw == false) {
                                 ctx.lineWidth = _strokeLineThickness;
                                 ctx.strokeStyle = _color(_strokeDrawColor).rgba();
+                                _viewBegin(ctx);
                                 ctx.beginPath();
                                 ctx.moveTo(cursX, cursY);
                                 ctx.lineTo(cursXt, cursYt);
                                 ctx.stroke();
+                                _viewEnd(ctx);
                             } else {
                                 cursSkipdraw = false;
                             }
@@ -2550,8 +2559,6 @@ var QB = new function() {
     };
 
     this.sub_Circle = function(step, x, y, radius, color, startAngle, endAngle, aspect) {
-        _warnViewport("CIRCLE");
-
         var screen = _images[_activeImage];
         var ctx = screen.ctx;
         _flushScreenCache(screen);
@@ -2588,17 +2595,19 @@ var QB = new function() {
         ctx.lineWidth = _strokeLineThickness;
         ctx.lineWidth += Math.tanh(8*radius*_screenDiagInv); // Adds some radius to compensate for antialiasing. The prefactor 8 is arbitrary. //
         ctx.strokeStyle = color.rgba();
+        _viewBegin(ctx);
         ctx.beginPath();
         if (aspect == undefined) {
             ctx.arc(x, y, radius, -endAngle, -startAngle);
         } else {
             if (aspect < 1) {
-                ctx.ellipse(x, y, radius, radius * aspect, 0, -endAngle, -startAngle); 
+                ctx.ellipse(x, y, radius, radius * aspect, 0, -endAngle, -startAngle);
             } else {
-                ctx.ellipse(x, y, radius / aspect, radius, 0, -endAngle, -startAngle); 
+                ctx.ellipse(x, y, radius / aspect, radius, 0, -endAngle, -startAngle);
             }
         }
         ctx.stroke();
+        _viewEnd(ctx);
         _strokeDrawColor = _color(color);
     };
 
@@ -2625,7 +2634,6 @@ var QB = new function() {
     };
 
     this.sub_Line = function(sstep, sx, sy, estep, ex, ey, color, style, pattern) {
-        _warnViewport("LINE");
         var screen = _images[_activeImage];
         _flushScreenCache(_images[_activeImage]);
 
@@ -2677,8 +2685,9 @@ var QB = new function() {
             }
         }
 
-        var ctx = screen.ctx; 
+        var ctx = screen.ctx;
         ctx.lineWidth = _strokeLineThickness;
+        _viewBegin(ctx);
         if (pattern == undefined || pattern == "BF") {
             
             var width = ex-sx;
@@ -2712,6 +2721,7 @@ var QB = new function() {
                 lineStyle(sx, sy, ex, ey, value);
             }
         }
+        _viewEnd(ctx);
 
         _strokeDrawColor = _color(color);
     };
@@ -3021,7 +3031,6 @@ var QB = new function() {
     }
 
     this.sub_Paint = function(sstep, startX, startY, fillColor, borderColor) {
-        _warnViewport("PAINT");
         // See: http://www.williammalone.com/articles/html5-canvas-javascript-paint-bucket-tool/
         // TODO: this method should probably utilize the same screen cache as PSet
         _flushScreenCache(_images[_activeImage]);
@@ -3036,7 +3045,22 @@ var QB = new function() {
             x0 = screen.lastX + x0;
             y0 = screen.lastY + y0;
         }
-        
+
+        // the fill stays inside the view port, whose corner the start point is relative to
+        var origin = _viewOrigin();
+        x0 += origin.x;
+        y0 += origin.y;
+        var minX = 0, minY = 0, maxX = screen.canvas.width - 1, maxY = screen.canvas.height - 1;
+        if (_viewport != undefined) {
+            minX = Math.max(minX, _viewport.x1);
+            minY = Math.max(minY, _viewport.y1);
+            maxX = Math.min(maxX, _viewport.x2);
+            maxY = Math.min(maxY, _viewport.y2);
+        }
+        if (Math.floor(x0) < minX || Math.floor(x0) > maxX || Math.floor(y0) < minY || Math.floor(y0) > maxY) {
+            return;
+        }
+
         fillColor = _color(fillColor);
         if (borderColor == undefined) {
             borderColor = fillColor;
@@ -3054,7 +3078,7 @@ var QB = new function() {
             y = newPos[1];
             pixelIndex = (y * screen.canvas.width + x) * 4;
 
-            while ((y-- >= 0) && checkPixel(data, pixelIndex, fillColor, borderColor)) {
+            while ((y-- >= minY) && checkPixel(data, pixelIndex, fillColor, borderColor)) {
                 pixelIndex -= screen.canvas.width * 4;
             }
             pixelIndex += screen.canvas.width * 4;
@@ -3062,14 +3086,14 @@ var QB = new function() {
 
             flagLeft = false;
             flagRight = false;
-            while ((y++ < screen.canvas.height - 1) && checkPixel(data, pixelIndex, fillColor, borderColor)) {
+            while ((y++ < maxY) && checkPixel(data, pixelIndex, fillColor, borderColor)) {
                 ctx.fillStyle = fillColor.rgba();
                 ctx.fillRect(x, y, 1, 1);
                 data[pixelIndex] = fillColor.r;
                 data[pixelIndex+1] = fillColor.g;
                 data[pixelIndex+2] = fillColor.b;
                 data[pixelIndex+3] = fillColor.a;
-                if (x > 0) {
+                if (x > minX) {
                     if (checkPixel(data, pixelIndex - 4, fillColor, borderColor)) {
                         if (!flagLeft) {
                             pixelStack.push([x - 1, y]);
@@ -3079,7 +3103,7 @@ var QB = new function() {
                         flagLeft = false;
                     }
                 }
-                if (x < screen.canvas.width - 1) {
+                if (x < maxX) {
                     if (checkPixel(data, pixelIndex + 4, fillColor, borderColor)) {
                         if (!flagRight) {
                             pixelStack.push([x + 1, y]);
@@ -3131,7 +3155,14 @@ var QB = new function() {
                 }
             }
         } else {
-            if (!screen.cached) { 
+            // relative to the view port's corner; a point outside the view port is -1, as in QB64
+            var origin = _viewOrigin();
+            x += origin.x;
+            y += origin.y;
+            if (!_inViewport(x, y)) {
+                return -1;
+            }
+            if (!screen.cached) {
                 var ctx = screen.ctx;
                 screen.imgdata = ctx.getImageData(0, 0, screen.canvas.width, screen.canvas.height);
                 screen.cached = true;
@@ -3150,7 +3181,6 @@ var QB = new function() {
     };
 
     this.sub_PReset = function(sstep, x, y, color) {
-        _warnViewport("PRESET");
         var screen = _images[_activeImage];
         if (color == undefined) {
             color = _bgColor;
@@ -3558,7 +3588,6 @@ var QB = new function() {
     }
 
     this.sub_PSet = function(sstep, x, y, color) {
-        _warnViewport("PSET");
         var screen = _images[_activeImage];
         
         x = Math.round(x);
@@ -3587,6 +3616,15 @@ var QB = new function() {
 
         screen.lastX = x;
         screen.lastY = y;
+        _strokeDrawColor = _color(color);
+
+        // the graphics cursor stays in the view port's coordinates; the pixel is moved to its corner
+        var origin = _viewOrigin();
+        x += origin.x;
+        y += origin.y;
+        if (!_inViewport(x, y)) {
+            return;
+        }
 
         if (!screen.cached) {
         var ctx = screen.ctx;
@@ -3598,8 +3636,6 @@ var QB = new function() {
         screen.imgdata.data[pixelIndex + 1] = color.g;
         screen.imgdata.data[pixelIndex + 2] = color.b;
         screen.imgdata.data[pixelIndex + 3] = color.a * 255;
-
-        _strokeDrawColor = _color(color);
     };
 
     function _flushScreenCache(screen) {
@@ -3643,7 +3679,8 @@ var QB = new function() {
 
         var x1 = Math.floor(Math.min(sx, ex)), x2 = Math.floor(Math.max(sx, ex));
         var y1 = Math.floor(Math.min(sy, ey)), y2 = Math.floor(Math.max(sy, ey));
-        arr._image = screen.ctx.getImageData(x1, y1, x2 - x1 + 1, y2 - y1 + 1);
+        var origin = _viewOrigin();
+        arr._image = screen.ctx.getImageData(x1 + origin.x, y1 + origin.y, x2 - x1 + 1, y2 - y1 + 1);
     };
 
     this.sub_PutGraphics = function(sstep, x, y, arr, action) {
@@ -3659,8 +3696,9 @@ var QB = new function() {
         }
         screen.lastX = x;
         screen.lastY = y;
-        x = Math.floor(x);
-        y = Math.floor(y);
+        var origin = _viewOrigin();
+        x = Math.floor(x) + origin.x;
+        y = Math.floor(y) + origin.y;
 
         var src = arr._image;
         var ctx = screen.ctx;
@@ -4397,8 +4435,9 @@ var QB = new function() {
         return String(value);
     };
 
-    // VIEW sets the graphics view port, VIEW alone ends it. Only CLS uses the view port so far:
-    // drawing statements do not move to its corner or clip to it (see _warnViewport).
+    // VIEW sets the graphics view port, VIEW alone ends it. Drawing is clipped to the port, and its
+    // coordinates are relative to the port's corner (with VIEW SCREEN they stay the screen's). WINDOW
+    // still maps to the whole screen, not to the port.
     this.sub_View = function(sstep, sx, sy, estep, ex, ey, fillColor, borderColor, screenSwitch) {
         var screen = _images[_activeImage];
         if (sx == undefined || sy == undefined || ex == undefined || ey == undefined) {
@@ -4407,7 +4446,7 @@ var QB = new function() {
         }
         var x1 = Math.min(sx, ex), x2 = Math.max(sx, ex);
         var y1 = Math.min(sy, ey), y2 = Math.max(sy, ey);
-        _viewport = { x1: x1, y1: y1, x2: x2, y2: y2 };
+        _viewport = { x1: x1, y1: y1, x2: x2, y2: y2, screen: !!screenSwitch };
         _flushScreenCache(screen);
         var ctx = screen.ctx;
         if (fillColor != undefined) {
@@ -4421,10 +4460,37 @@ var QB = new function() {
         }
     };
 
-    function _warnViewport(statement) {
-        if (_viewport != undefined && !_viewportWarned) {
-            _viewportWarned = true;
-            console.warn(statement + " was used while a VIEW is set; it is not moved to or clipped to the view port.");
+    // The view port's corner, to which drawing coordinates are relative: (0, 0) with no view port, and
+    // with VIEW SCREEN, whose coordinates stay the screen's
+    function _viewOrigin() {
+        if (_viewport == undefined || _viewport.screen) {
+            return { x: 0, y: 0 };
+        }
+        return { x: _viewport.x1, y: _viewport.y1 };
+    }
+
+    // Whether the screen pixel (x, y) is inside the view port; always true with no view port
+    function _inViewport(x, y) {
+        return _viewport == undefined ||
+            (x >= _viewport.x1 && x <= _viewport.x2 && y >= _viewport.y1 && y <= _viewport.y2);
+    }
+
+    // Canvas drawing between _viewBegin and _viewEnd is clipped to the view port and moved to its corner
+    function _viewBegin(ctx) {
+        if (_viewport == undefined) {
+            return;
+        }
+        var origin = _viewOrigin();
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(_viewport.x1, _viewport.y1, _viewport.x2 - _viewport.x1 + 1, _viewport.y2 - _viewport.y1 + 1);
+        ctx.clip();
+        ctx.translate(origin.x, origin.y);
+    }
+
+    function _viewEnd(ctx) {
+        if (_viewport != undefined) {
+            ctx.restore();
         }
     }
 
