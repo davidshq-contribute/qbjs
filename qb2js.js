@@ -955,7 +955,7 @@ var OBJ = await __qblib_lib_lang_object_bas();
 var JSArray = await __qblib_lib_lang_array_bas();
 var String = await __qblib_lib_lang_string_bas();
 /* global constants: */ const FILE  =    1; const   TEXT  =    2; const MWARNING  =    0; const   MERROR  =    1; const False  =    0; const True  =   ~ False; const LF  =   (QB.func_Chr(  10)); const CR  =   (QB.func_Chr(  13)); const CRLF  =    CR +  LF; const PrintDataTypes  =    True; const PrintLineMapping  =    False; const PrintTokenizedLine  =    False; 
-/* shared variables: */ var moduleMap = QB.initArray([0], {name:'',path:'',source:'',exportMethods:{},exportConsts:{},imports:{},processed:0}); var modules = QB.initArray([0], {name:'',path:'',source:'',exportMethods:{},exportConsts:{},imports:{},processed:0}); var lines = QB.initArray([0], {line:0,text:'',mtype:0,moduleId:0,module:0}); var jsLines = QB.initArray([0], {line:0,text:'',mtype:0,moduleId:0,module:0}); var methods = QB.initArray([0], {line:0,lastLine:0,type:'',returnType:'',name:'',uname:'',argc:0,args:'',jsname:'',sync:0,builtin:0,dynamic:0}); var localMethods = QB.initArray([0], {line:0,lastLine:0,type:'',returnType:'',name:'',uname:'',argc:0,args:'',jsname:'',sync:0,builtin:0,dynamic:0}); var types = QB.initArray([0], {line:0,name:'',argc:0,args:''}); var typeVars = QB.initArray([0], {type:'',name:'',jsname:'',isConst:0,isArray:0,arraySize:0,typeId:0}); var globalVars = QB.initArray([0], {type:'',name:'',jsname:'',isConst:0,isArray:0,arraySize:0,typeId:0}); var localVars = QB.initArray([0], {type:'',name:'',jsname:'',isConst:0,isArray:0,arraySize:0,typeId:0}); var warnings = QB.initArray([0], {line:0,text:'',mtype:0,moduleId:0,module:0}); var importLines = QB.initArray([0], ''); var exportLines = QB.initArray([0], ''); var exportConsts = QB.initArray([0], {type:'',name:'',jsname:'',isConst:0,isArray:0,arraySize:0,typeId:0}); var exportMethods = QB.initArray([0], {line:0,lastLine:0,type:'',returnType:'',name:'',uname:'',argc:0,args:'',jsname:'',sync:0,builtin:0,dynamic:0}); var dataArray = QB.initArray([0], ''); var dataLabels = QB.initArray([0], {text:'',index:0}); var includeOnceMap = QB.initArray([0], 0); var jsReservedWords = QB.initArray([0], ''); var modLevel = 0; var currentMethod = ''; var activeModule = {name:'',path:'',source:'',exportMethods:{},exportConsts:{},imports:{},processed:0}; var currentModule = ''; var currentModuleId = 0; var programMethods = 0; var constVarLine = 0; var sharedVarLine = 0; var staticVarLine = 0; var implicitVarLine = 0; var condWords = QB.initArray([0], ''); var forceSelfConvert = 0; var optionRoundHalfEven = 0; var optionByRef = 0; var byRefMeta = 0; var byRefPre = ''; var byRefPost = ''; var optionExplicit = 0; var optionExplicitArray = 0; var defLine = QB.initArray([0], 0); var defFirst = QB.initArray([0], 0); var defLast = QB.initArray([0], 0); var defType = QB.initArray([0], ''); var defCurLine = 0; 
+/* shared variables: */ var moduleMap = QB.initArray([0], {name:'',path:'',source:'',exportMethods:{},exportConsts:{},imports:{},processed:0}); var modules = QB.initArray([0], {name:'',path:'',source:'',exportMethods:{},exportConsts:{},imports:{},processed:0}); var lines = QB.initArray([0], {line:0,text:'',mtype:0,moduleId:0,module:0}); var jsLines = QB.initArray([0], {line:0,text:'',mtype:0,moduleId:0,module:0}); var methods = QB.initArray([0], {line:0,lastLine:0,type:'',returnType:'',name:'',uname:'',argc:0,args:'',jsname:'',sync:0,builtin:0,dynamic:0}); var localMethods = QB.initArray([0], {line:0,lastLine:0,type:'',returnType:'',name:'',uname:'',argc:0,args:'',jsname:'',sync:0,builtin:0,dynamic:0}); var types = QB.initArray([0], {line:0,name:'',argc:0,args:''}); var typeVars = QB.initArray([0], {type:'',name:'',jsname:'',isConst:0,isArray:0,arraySize:0,typeId:0}); var globalVars = QB.initArray([0], {type:'',name:'',jsname:'',isConst:0,isArray:0,arraySize:0,typeId:0}); var localVars = QB.initArray([0], {type:'',name:'',jsname:'',isConst:0,isArray:0,arraySize:0,typeId:0}); var warnings = QB.initArray([0], {line:0,text:'',mtype:0,moduleId:0,module:0}); var importLines = QB.initArray([0], ''); var exportLines = QB.initArray([0], ''); var exportConsts = QB.initArray([0], {type:'',name:'',jsname:'',isConst:0,isArray:0,arraySize:0,typeId:0}); var exportMethods = QB.initArray([0], {line:0,lastLine:0,type:'',returnType:'',name:'',uname:'',argc:0,args:'',jsname:'',sync:0,builtin:0,dynamic:0}); var dataArray = QB.initArray([0], ''); var dataLabels = QB.initArray([0], {text:'',index:0}); var includeOnceMap = QB.initArray([0], 0); var jsReservedWords = QB.initArray([0], ''); var modLevel = 0; var currentMethod = ''; var activeModule = {name:'',path:'',source:'',exportMethods:{},exportConsts:{},imports:{},processed:0}; var currentModule = ''; var currentModuleId = 0; var programMethods = 0; var constVarLine = 0; var sharedVarLine = 0; var staticVarLine = 0; var implicitVarLine = 0; var condWords = QB.initArray([0], ''); var forceSelfConvert = 0; var optionRoundHalfEven = 0; var optionByRef = 0; var byRefMeta = 0; var optionQBBooleans = 0; var booleansMeta = 0; var byRefPre = ''; var byRefPost = ''; var optionExplicit = 0; var optionExplicitArray = 0; var defLine = QB.initArray([0], 0); var defFirst = QB.initArray([0], 0); var defLast = QB.initArray([0], 0); var defType = QB.initArray([0], ''); var defCurLine = 0; 
 /* static method variables: */ 
 async function main() {
 
@@ -994,6 +994,8 @@ async function main() {
    optionRoundHalfEven = 0;  /* INTEGER */ 
    optionByRef = 0;  /* INTEGER */ 
    byRefMeta = 0;  /* INTEGER */ 
+   optionQBBooleans = 0;  /* INTEGER */ 
+   booleansMeta = 0;  /* INTEGER */ 
    byRefPre = '';  /* STRING */ 
    byRefPost = '';  /* STRING */ 
    optionExplicit = 0;  /* INTEGER */ 
@@ -1224,6 +1226,7 @@ if (QB.halted()) { return; };
       await sub_AddJSLine(  0,   "function setSelfConvert() { sub_SetSelfConvert(); }");
       await sub_AddJSLine(  0,   "function setRoundHalfEven() { sub_SetRoundHalfEven(); }");
       await sub_AddJSLine(  0,   "function setByRef() { sub_SetByRef(); }");
+      await sub_AddJSLine(  0,   "function setQBBooleans() { sub_SetQBBooleans(); }");
       await sub_AddJSLine(  0,   "");
       await sub_AddJSLine(  0,   "return {");
       await sub_AddJSLine(  0,   "   compile: compile,");
@@ -1236,6 +1239,7 @@ if (QB.halted()) { return; };
       await sub_AddJSLine(  0,   "   setSelfConvert: setSelfConvert,");
       await sub_AddJSLine(  0,   "   setRoundHalfEven: setRoundHalfEven,");
       await sub_AddJSLine(  0,   "   setByRef: setByRef,");
+      await sub_AddJSLine(  0,   "   setQBBooleans: setQBBooleans,");
       await sub_AddJSLine(  0,   "};");
       await sub_AddJSLine(  0,   "}");
       await sub_AddJSLine(  0,   "if (typeof module != 'undefined') { module.exports.QBCompiler = _QBCompiler; }");
@@ -1264,6 +1268,18 @@ var ByRefEnabled = null;
 /* implicit variables: */ 
    ByRefEnabled =  optionByRef |  byRefMeta;
 return ByRefEnabled;
+}
+async function sub_SetQBBooleans() {
+if (QB.halted()) { return; }; 
+/* implicit variables: */ 
+   optionQBBooleans = QB.roundInt(  True );
+}
+async function func_QBBooleansEnabled() {
+if (QB.halted()) { return; }; 
+var QBBooleansEnabled = null;
+/* implicit variables: */ 
+   QBBooleansEnabled =  optionQBBooleans |  booleansMeta;
+return QBBooleansEnabled;
 }
 async function sub_InitTypes() {
 if (QB.halted()) { return; }; 
@@ -1313,6 +1329,7 @@ if (QB.halted()) { return; };
    QB.resizeArray(exportMethods, [{l:0,u: 0}], {line:0,lastLine:0,type:'',returnType:'',name:'',uname:'',argc:0,args:'',jsname:'',sync:0,builtin:0,dynamic:0}, false);  /* METHOD */ 
    QB.resizeArray(exportConsts, [{l:0,u: 0}], {type:'',name:'',jsname:'',isConst:0,isArray:0,arraySize:0,typeId:0}, false);  /* VARIABLE */ 
    byRefMeta = QB.roundInt(  False );
+   booleansMeta = QB.roundInt(  False );
    QB.resizeArray(defLine, [{l:0,u: 0}], 0, false);  /* INTEGER */ 
    QB.resizeArray(defFirst, [{l:0,u: 0}], 0, false);  /* INTEGER */ 
    QB.resizeArray(defLast, [{l:0,u: 0}], 0, false);  /* INTEGER */ 
@@ -1664,6 +1681,14 @@ if (QB.halted()) { return; }; firstLine = QB.roundInt(firstLine); lastLine = QB.
             }
             if ( second !=  "ON" ) {
                await sub_AddWarning(  i,   "Expected $BYREF ON");
+            }
+         } else if ( first ==  "$BOOLEANS" ) {
+            second = "";
+            if ((QB.func_UBound(  parts))  > 1) {
+               second = (QB.func_UCase( (await String.func_Trim( QB.arrayValue(parts, [ 2]).value))));
+            }
+            if ( second !=  "QB" ) {
+               await sub_AddWarning(  i,   "Expected $BOOLEANS QB");
             }
          } else if ( first ==  "$ROUNDING" ) {
             second = "";
@@ -3560,6 +3585,12 @@ var ConvertExpression = null;
    var bvar = {type:'',name:'',jsname:'',isConst:0,isArray:0,arraySize:0,typeId:0};  /* VARIABLE */ 
    var m = {line:0,lastLine:0,type:'',returnType:'',name:'',uname:'',argc:0,args:'',jsname:'',sync:0,builtin:0,dynamic:0};  /* METHOD */ 
    var intdiv = 0;  /* INTEGER */ 
+   var segStart = 0;  /* INTEGER */ 
+   segStart = QB.roundInt(  0 );
+   var segCmp = 0;  /* INTEGER */ 
+   segCmp = QB.roundInt(  False );
+   var booleans = 0;  /* INTEGER */ 
+   booleans = QB.roundInt( await func_QBBooleansEnabled() );
    var stringLiteral = 0;  /* INTEGER */ 
    var i = 0;  /* INTEGER */ 
    i = QB.roundInt(  1 );
@@ -3577,6 +3608,16 @@ var ConvertExpression = null;
             }
             var uword = '';  /* STRING */ 
             uword = (QB.func_UCase( (await String.func_Trim(  word))));
+            if ( booleans) {
+               if ((await func_IsLogicalWord(  uword)) ) {
+                  js = (await func_CloseCompare(  js,    segStart,    segCmp));
+                  segCmp = QB.roundInt(  False );
+               } else if ( uword ==  "="  |  uword ==  "<>"  |  uword ==  "<"  |  uword ==  ">"  |  uword ==  "<="  |  uword ==  ">="  |  uword ==  "=<"  |  uword ==  "=>" ) {
+                  if ((await String.func_Trim( (QB.func_Mid(  js,    segStart +  1))))  !=  "" ) {
+                     segCmp = QB.roundInt(  True );
+                  }
+               }
+            }
             if ( uword ==  "NOT" ) {
                js =  js + "~";
             } else if ( uword ==  "NEGATE"  |  uword ==  "_NEGATE" ) {
@@ -3659,8 +3700,16 @@ var ConvertExpression = null;
                   }
                }
             }
+            if ( booleans & (await func_IsLogicalWord(  uword)) ) {
+               segStart = QB.roundInt( (QB.func_Len(  js)) );
+            }
             if ( c ==  ","  &  i !=  (QB.func_Len(  ex)) ) {
+               if ( booleans) {
+                  js = (await func_CloseCompare(  js,    segStart,    segCmp));
+               }
+               segCmp = QB.roundInt(  False );
                js =  js + ",";
+               segStart = QB.roundInt( (QB.func_Len(  js)) );
             }
             word = "";
          } else if ( c ==  "(" ) {
@@ -3760,11 +3809,36 @@ var ConvertExpression = null;
       }
       i = QB.roundInt(  i +  1 );
    }
+   if ( booleans) {
+      js = (await func_CloseCompare(  js,    segStart,    segCmp));
+   }
    if ( intdiv) {
       js = (await func_ConvertIntDiv(  js));
    }
+   if ( booleans) {
+      js = (await String.func_Replace(  js,   " "  + (QB.func_Chr(  1))  + " " ,   " QB.toBoolean("));
+      js = (await String.func_Replace(  js,   " "  + (QB.func_Chr(  2))  + " " ,   ") "));
+   }
    ConvertExpression =  js;
 return ConvertExpression;
+}
+async function func_IsLogicalWord(uword/*STRING*/) {
+if (QB.halted()) { return; }; 
+var IsLogicalWord = null;
+/* implicit variables: */ 
+   IsLogicalWord = ( uword ==  "NOT"  |  uword ==  "NEGATE"  |  uword ==  "_NEGATE"  |  uword ==  "AND"  |  uword ==  "OR"  |  uword ==  "ANDALSO"  |  uword ==  "_ANDALSO"  |  uword ==  "ORELSE"  |  uword ==  "_ORELSE"  |  uword ==  "XOR"  |  uword ==  "EQV"  |  uword ==  "IMP");
+return IsLogicalWord;
+}
+async function func_CloseCompare(js/*STRING*/,segStart/*INTEGER*/,segCmp/*INTEGER*/) {
+if (QB.halted()) { return; }; segStart = QB.roundInt(segStart); segCmp = QB.roundInt(segCmp); 
+var CloseCompare = null;
+/* implicit variables: */ 
+   if ( segCmp) {
+      CloseCompare = (QB.func_Left(  js,    segStart))  + " "  + (QB.func_Chr(  1))  + " "  + (QB.func_Mid(  js,    segStart +  1))  + " "  + (QB.func_Chr(  2))  + " ";
+   } else {
+      CloseCompare =  js;
+   }
+return CloseCompare;
 }
 async function func_ConvertIntDiv(s/*STRING*/) {
 if (QB.halted()) { return; }; 
@@ -4660,6 +4734,11 @@ if (QB.halted()) { return; };
       if ( word ==  "$BYREF"  &  pcount > 1 & ~ ifSkip) {
          if ((QB.func_UCase( QB.arrayValue(parts, [ 2]).value))  ==  "ON" ) {
             byRefMeta = QB.roundInt(  True );
+         }
+      }
+      if ( word ==  "$BOOLEANS"  &  pcount > 1 & ~ ifSkip) {
+         if ((QB.func_UCase( QB.arrayValue(parts, [ 2]).value))  ==  "QB" ) {
+            booleansMeta = QB.roundInt(  True );
          }
       }
       if (( word ==  "DEFINT"  |  word ==  "DEFLNG"  |  word ==  "DEFSNG"  |  word ==  "DEFDBL"  |  word ==  "DEFSTR"  |  word ==  "_DEFINE")  & ~ ifSkip) {
@@ -6389,6 +6468,7 @@ function getModule(id) {
 function setSelfConvert() { sub_SetSelfConvert(); }
 function setRoundHalfEven() { sub_SetRoundHalfEven(); }
 function setByRef() { sub_SetByRef(); }
+function setQBBooleans() { sub_SetQBBooleans(); }
 
 return {
    compile: compile,
@@ -6401,6 +6481,7 @@ return {
    setSelfConvert: setSelfConvert,
    setRoundHalfEven: setRoundHalfEven,
    setByRef: setByRef,
+   setQBBooleans: setQBBooleans,
 };
 }
 if (typeof module != 'undefined') { module.exports.QBCompiler = _QBCompiler; }

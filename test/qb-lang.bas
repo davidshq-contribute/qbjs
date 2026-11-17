@@ -173,6 +173,11 @@ UT.AssertEquals Not bPositive(5), 0
 UT.AssertEquals Not bPositive(-5), -1
 UT.AssertTrue (Not bPositive(-5) Or bPositive(-5))
 
+' without $BOOLEANS QB an AND of two comparisons is JavaScript's true & true, which is 1 (QB gives -1;
+' qb-booleans.bas has the switch on)
+cmpInt = 3 > 2 And 2 > 1
+UT.AssertEquals cmpInt, 1
+
 Console.Echo "QB Language - tests completed with no errors* in " + (Sys.TimeInMillis - ts) + " millisecond(s)"
 
 Sub OffBump (n As Integer)

@@ -19,6 +19,9 @@ async function compile(src) {
         if (process.argv.includes("--byref")) {
             qbc.setByRef();
         }
+        if (process.argv.includes("--qb-booleans")) {
+            qbc.setQBBooleans();
+        }
         result = "async function __qbjs_run() {\n" + await qbc.compile(data) + "\n}";
     }
     fs.writeFileSync(process.argv[3], result, "utf8");

@@ -127,6 +127,10 @@ Dim Shared As Integer optionRoundHalfEven
 ' that ConvertMethodParamsRef wrote for the arguments it passes by reference.
 Dim Shared As Integer optionByRef
 Dim Shared As Integer byRefMeta
+' A comparison gives QB's -1 or 0 instead of JavaScript's true or false. optionQBBooleans is the compiler
+' option; booleansMeta is set for one module by its $BOOLEANS QB line.
+Dim Shared As Integer optionQBBooleans
+Dim Shared As Integer booleansMeta
 Dim Shared As String byRefPre
 Dim Shared As String byRefPost
 Dim Shared As Integer optionExplicit
@@ -370,6 +374,7 @@ Sub Compile (source As String, moduleName As String, selfConvert)
         AddJSLine 0, "function setSelfConvert() { sub_SetSelfConvert(); }"
         AddJSLine 0, "function setRoundHalfEven() { sub_SetRoundHalfEven(); }"
         AddJSLine 0, "function setByRef() { sub_SetByRef(); }"
+        AddJSLine 0, "function setQBBooleans() { sub_SetQBBooleans(); }"
         AddJSLine 0, ""
         AddJSLine 0, "return {"
         AddJSLine 0, "   compile: compile,"
@@ -382,6 +387,7 @@ Sub Compile (source As String, moduleName As String, selfConvert)
         AddJSLine 0, "   setSelfConvert: setSelfConvert,"
         AddJSLine 0, "   setRoundHalfEven: setRoundHalfEven,"
         AddJSLine 0, "   setByRef: setByRef,"
+        AddJSLine 0, "   setQBBooleans: setQBBooleans,"
         AddJSLine 0, "};"
         AddJSLine 0, "}"
         AddJSLine 0, "if (typeof module != 'undefined') { module.exports.QBCompiler = _QBCompiler; }"
@@ -414,6 +420,17 @@ End Sub
 
 Function ByRefEnabled
     ByRefEnabled = optionByRef Or byRefMeta
+End Function
+
+' The compiler option for comparisons that give -1 for true and 0 for false, as in QB, instead of
+' JavaScript's true and false. Then 3 > 2 AND 2 > 1 is -1 (JavaScript's true & true is 1), NOT of it is 0,
+' and PRINT 3 > 2 prints -1. The $BOOLEANS QB metacommand does the same for the module it is in.
+Sub SetQBBooleans ()
+    optionQBBooleans = True
+End Sub
+
+Function QBBooleansEnabled
+    QBBooleansEnabled = optionQBBooleans Or booleansMeta
 End Function
 
 Sub InitTypes
@@ -464,6 +481,7 @@ Sub ResetDataStructures
     ReDim As Method exportMethods(0)
     ReDim As Variable exportConsts(0)
     byRefMeta = False
+    booleansMeta = False
     ReDim As Integer defLine(0)
     ReDim As Integer defFirst(0)
     ReDim As Integer defLast(0)
@@ -831,6 +849,13 @@ Sub ConvertLines (firstLine As Integer, lastLine As Integer, functionName As Str
                 second = ""
                 If UBound(parts) > 1 Then second = UCase$(String.Trim(parts(2)))
                 If second <> "ON" Then AddWarning i, "Expected $BYREF ON"
+
+            ElseIf first = "$BOOLEANS" Then
+                ' $BOOLEANS QB makes a comparison give -1 or 0, as in QB. FindMethods read it before any
+                ' line was converted, so that it applies to the whole module.
+                second = ""
+                If UBound(parts) > 1 Then second = UCase$(String.Trim(parts(2)))
+                If second <> "QB" Then AddWarning i, "Expected $BOOLEANS QB"
 
             ElseIf first = "$ROUNDING" Then
                 ' $ROUNDING EVEN rounds to the even number, as QB does; $ROUNDING UP (the default) rounds
@@ -2715,6 +2740,13 @@ Function ConvertExpression$ (ex As String, lineNumber As Integer)
     Dim bvar As Variable
     Dim m As Method
     Dim intdiv As Integer
+    ' $BOOLEANS QB: the stretch of the expression since the last logical operator or comma starts at
+    ' segStart in js, and segCmp says whether it holds a comparison. A comparison binds more loosely than
+    ' arithmetic and more tightly than NOT, AND, OR and XOR, so such a stretch is the comparison with its
+    ' operands. CloseCompare marks it, and the marks become QB.toBoolean(...) at the end.
+    Dim segStart As Integer: segStart = 0
+    Dim segCmp As Integer: segCmp = False
+    Dim booleans As Integer: booleans = QBBooleansEnabled
 
     Dim stringLiteral As Integer
     Dim i As Integer: i = 1
@@ -2732,6 +2764,16 @@ Function ConvertExpression$ (ex As String, lineNumber As Integer)
             If c = " " Or c = "," Or i = Len(ex) Then ' isOperator Or i = Len(ex) Then
                 If i = Len(ex) Then word = word + c
                 Dim uword As String: uword = UCase$(String.Trim(word))
+                If booleans Then
+                    If IsLogicalWord(uword) Then
+                        js = CloseCompare(js, segStart, segCmp)
+                        segCmp = False
+                    ElseIf uword = "=" Or uword = "<>" Or uword = "<" Or uword = ">" Or uword = "<=" Or uword = ">=" Or uword = "=<" Or uword = "=>" Then
+                        ' Not when nothing comes before it: CASE IS < 4 converts "< 4", whose left side the
+                        ' caller writes, and whose result is only tested
+                        If String.Trim(Mid$(js, segStart + 1)) <> "" Then segCmp = True
+                    End If
+                End If
                 If uword = "NOT" Then
                     js = js + "~"
                 ElseIf uword = "NEGATE" Or uword = "_NEGATE" Then
@@ -2817,8 +2859,12 @@ Function ConvertExpression$ (ex As String, lineNumber As Integer)
 
                     End If
                 End If
+                If booleans And IsLogicalWord(uword) Then segStart = Len(js)
                 If c = "," And i <> Len(ex) Then
+                    If booleans Then js = CloseCompare(js, segStart, segCmp)
+                    segCmp = False
                     js = js + ","
+                    segStart = Len(js)
                 End If
                 word = ""
 
@@ -2927,10 +2973,34 @@ Function ConvertExpression$ (ex As String, lineNumber As Integer)
         End If
         i = i + 1
     Wend
+    If booleans Then js = CloseCompare(js, segStart, segCmp)
     If intdiv Then
         js = ConvertIntDiv(js)
     End If
+    If booleans Then
+        ' The marks of CloseCompare, each a word of its own, so that ConvertIntDiv passed over them
+        js = String.Replace(js, " " + Chr$(1) + " ", " QB.toBoolean(")
+        js = String.Replace(js, " " + Chr$(2) + " ", ") ")
+    End If
     ConvertExpression = js
+End Function
+
+' NOT, AND, OR, XOR and the other operators that bind more loosely than a comparison.
+Function IsLogicalWord (uword As String)
+    IsLogicalWord = (uword = "NOT" Or uword = "NEGATE" Or uword = "_NEGATE" Or uword = "AND" Or uword = "OR" Or _
+        uword = "ANDALSO" Or uword = "_ANDALSO" Or uword = "ORELSE" Or uword = "_ORELSE" Or uword = "XOR" Or _
+        uword = "EQV" Or uword = "IMP")
+End Function
+
+' $BOOLEANS QB: when the stretch of js from segStart holds a comparison, marks its start and end, which
+' ConvertExpression turns into QB.toBoolean( and ) once ConvertIntDiv has run. The caller clears segCmp:
+' this compiler is built without $BYREF, so a parameter it changes is not changed for the caller.
+Function CloseCompare$ (js As String, segStart As Integer, segCmp As Integer)
+    If segCmp Then
+        CloseCompare = Left$(js, segStart) + " " + Chr$(1) + " " + Mid$(js, segStart + 1) + " " + Chr$(2) + " "
+    Else
+        CloseCompare = js
+    End If
 End Function
 
 Function ConvertIntDiv$ (s As String)
@@ -3807,7 +3877,7 @@ Sub FindMethods
         If rawJS Then _Continue
 
         ' Skip the lines that ConvertLines skips: an $IF other than $IF WEB up to its $END, and
-        ' from an $ELSE or $ELSEIF to the $END. Only the $BYREF and DEF lines below follow this.
+        ' from an $ELSE or $ELSEIF to the $END. Only the $BYREF, $BOOLEANS and DEF lines below follow this.
         If ifSkip Then
             If Left$(word, 4) = "$END" Then ifSkip = False
         ElseIf word = "$ELSE" Or word = "$ELSEIF" Then
@@ -3819,6 +3889,9 @@ Sub FindMethods
         defCurLine = i
         If word = "$BYREF" And pcount > 1 And Not ifSkip Then
             If UCase$(parts(2)) = "ON" Then byRefMeta = True
+        End If
+        If word = "$BOOLEANS" And pcount > 1 And Not ifSkip Then
+            If UCase$(parts(2)) = "QB" Then booleansMeta = True
         End If
         If (word = "DEFINT" Or word = "DEFLNG" Or word = "DEFSNG" Or word = "DEFDBL" Or word = "DEFSTR" Or word = "_DEFINE") And Not ifSkip Then
             RegisterDefType i, word, Join(parts(), 2, -1, " ")
