@@ -159,17 +159,18 @@ UT.AssertEquals tt, 2.5
 UT.AssertEquals bAddOne(1.4), 1
 UT.AssertEquals dtTwice(2.6), 5.2
 
-' a comparison stored in an integer is -1 for true and 0 for false, so NOT of it is 0 and -1 (not -2 and -1)
+' without $BOOLEANS QB a comparison stored in an integer is JavaScript's 1 for true and 0 for false
+' (QB gives -1; qb-booleans.bas has the switch on)
 Dim cmpInt As Integer, cmpLng As Long
 cmpInt = 3 > 2
-UT.AssertEquals cmpInt, -1
+UT.AssertEquals cmpInt, 1
 cmpInt = 3 < 2
 UT.AssertEquals cmpInt, 0
 cmpLng = (3 > 2)
-UT.AssertEquals cmpLng, -1
-UT.AssertEquals bPositive(5), -1
+UT.AssertEquals cmpLng, 1
+UT.AssertEquals bPositive(5), 1
 UT.AssertEquals bPositive(-5), 0
-UT.AssertEquals Not bPositive(5), 0
+UT.AssertEquals Not bPositive(5), -2
 UT.AssertEquals Not bPositive(-5), -1
 UT.AssertTrue (Not bPositive(-5) Or bPositive(-5))
 

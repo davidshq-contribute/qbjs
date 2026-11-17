@@ -262,6 +262,7 @@ Sub Compile (source As String, moduleName As String, selfConvert)
 
     If Not selfConvert And moduleName = "" Then AddJSLine 0, "QB.start();"
     If Not selfConvert And moduleName = "" And optionRoundHalfEven Then AddJSLine 0, "QB.setRoundHalfEven(true);"
+    If Not selfConvert And moduleName = "" And optionQBBooleans Then AddJSLine 0, "QB.setQBBooleans(true);"
 
     If Not selfConvert And moduleName = "" Then
         Dim mtest As Method
@@ -856,6 +857,8 @@ Sub ConvertLines (firstLine As Integer, lastLine As Integer, functionName As Str
                 second = ""
                 If UBound(parts) > 1 Then second = UCase$(String.Trim(parts(2)))
                 If second <> "QB" Then AddWarning i, "Expected $BOOLEANS QB"
+                ' and a comparison stored in an integer gives -1 for true, not JavaScript's 1
+                If second = "QB" Then js = "QB.setQBBooleans(true);"
 
             ElseIf first = "$ROUNDING" Then
                 ' $ROUNDING EVEN rounds to the even number, as QB does; $ROUNDING UP (the default) rounds
