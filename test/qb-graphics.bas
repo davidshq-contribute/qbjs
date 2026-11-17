@@ -40,6 +40,12 @@ UT.AssertEquals Point(420, 320), green
 UT.AssertEquals Point(399, 320), white
 Cls
 UT.AssertEquals Point(200, 150), _RGB32(0, 0, 0)
+' a new SCREEN ends the view port, so CLS clears the whole screen again
+View (100, 100)-(300, 200)
+Screen 12
+Line (0, 0)-(639, 479), 4, BF
+Cls
+UT.AssertEquals Point(0, 0), _RGB32(0, 0, 0)
 
 ' GET (x1, y1)-(x2, y2), array saves a rectangle; PUT (x, y), array, action draws it back
 Dim saved(2000) As Integer

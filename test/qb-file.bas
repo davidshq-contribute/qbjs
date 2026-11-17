@@ -128,6 +128,37 @@ UT.AssertTrue EOF(1)
 Close #1
 Kill "test.txt"
 
+' A number's field also ends at a space; the spaces after it are skipped, then a comma or a line ending
+' is taken. A blank line is an empty field, 0 for a number. The values are QB64pe's.
+Open "test.txt" For Output As #1
+Print #1, 1; 2; 3
+Print #1, 7
+Print #1, "12 abc def,9"
+Print #1, "3 , 4"
+Print #1, ""
+Print #1, "8"
+Close #1
+Dim na As Single, nb As Single, nc As Single, nd As Single
+Dim ne As Integer, ns As String, nf As Long, ng As Single, nh As Single
+Open "test.txt" For Input As #1
+Input #1, na, nb, nc, nd
+UT.AssertEquals na, 1
+UT.AssertEquals nb, 2
+UT.AssertEquals nc, 3
+UT.AssertEquals nd, 7
+Input #1, ne, ns, nf
+UT.AssertEquals ne, 12
+UT.AssertEquals ns, "abc def"
+UT.AssertEquals nf, 9
+Input #1, ng, nh
+UT.AssertEquals ng, 3
+UT.AssertEquals nh, 4
+Input #1, ng, nh
+UT.AssertEquals ng, 0
+UT.AssertEquals nh, 8
+Close #1
+Kill "test.txt"
+
 MkDir "foo"
 UT.AssertTrue _DirExists("foo")
 UT.AssertTrue _DirExists("foo/")
@@ -169,7 +200,8 @@ wrArr(1) = 7: wrArr(2) = -3: wrName = "ab"
 Open "test.txt" For Output As #1
 Write #1, wrArr(1), wrArr(2), 5, wrName + "c", wrName
 Close #1
-UT.AssertEquals FS.ReadText("test.txt"), "7,-3,5,""abc"",""ab""" + CRLF
+Dim wrQ As String: wrQ = Chr$(34)
+UT.AssertEquals FS.ReadText("test.txt"), "7,-3,5," + wrQ + "abc" + wrQ + "," + wrQ + "ab" + wrQ + CRLF
 Kill "test.txt"
 
 ' INPUT # into an integer: QBJS cuts off the fraction; $ROUNDING EVEN rounds as QB does (3.5 to 4, 2.5 to 2)
@@ -191,5 +223,18 @@ $ROUNDING UP
 UT.AssertEquals inA%, 4
 UT.AssertEquals inB%, 2
 UT.AssertEquals inC&, 6
+
+' a LONG is rounded from the double, so a number above 16777216 (2 ^ 24) keeps its last digit
+Dim inBig&
+Open "test.txt" For Output As #1
+Print #1, "16777217"
+Close #1
+$ROUNDING EVEN
+Open "test.txt" For Input As #1
+Input #1, inBig&
+Close #1
+$ROUNDING UP
+UT.AssertEquals inBig&, 16777217
+Kill "test.txt"
 
 Console.Echo "QB File I/O - tests completed with no errors* in " + (Sys.TimeInMillis - ts) + " millisecond(s)"

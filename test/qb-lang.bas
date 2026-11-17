@@ -149,6 +149,13 @@ UT.AssertEquals nn, 3.6
 _DEFINE P-Q AS INTEGER
 pp = 9.9
 UT.AssertEquals pp, 10
+' a DEF line in a part that $IF skips does not count
+$IF WEB THEN
+$ELSE
+    DEFINT T
+$END IF
+tt = 2.5
+UT.AssertEquals tt, 2.5
 UT.AssertEquals bAddOne(1.4), 1
 UT.AssertEquals dtTwice(2.6), 5.2
 

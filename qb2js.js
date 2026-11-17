@@ -1943,6 +1943,16 @@ var RoundFunction = null;
    }
 return RoundFunction;
 }
+async function func_ToIntegerWide(typeName/*STRING*/) {
+if (QB.halted()) { return; }; 
+var ToIntegerWide = null;
+/* implicit variables: */ 
+   ToIntegerWide = "";
+   if ((await func_RoundFunction(  typeName))  ==  "QB.roundLong" ) {
+      ToIntegerWide = ", true";
+   }
+return ToIntegerWide;
+}
 async function func_IsValidVarname(varname/*STRING*/) {
 if (QB.halted()) { return; }; 
 var IsValidVarname = null;
@@ -2215,7 +2225,14 @@ var ConvertSub = null;
    } else if ( m.name ==  "Window" ) {
       js = (await func_CallMethod(  m))  + "("  + (await func_ConvertWindow(  args,    lineNumber))  + ");";
    } else if ( m.name ==  "View" ) {
-      js = (await func_CallMethod(  m))  + "("  + (await func_ConvertView(  args,    lineNumber))  + ");";
+      var viewArgs = '';  /* STRING */ 
+      viewArgs = (QB.func_UCase( (await String.func_Trim(  args))));
+      if ( viewArgs ==  "PRINT"  | (await String.func_StartsWith(  viewArgs,   "PRINT ")) ) {
+         js = "// View "  +  args;
+         await sub_AddWarning(  lineNumber,   "Missing or unsupported method: 'VIEW PRINT' - ignoring line");
+      } else {
+         js = (await func_CallMethod(  m))  + "("  + (await func_ConvertView(  args,    lineNumber))  + ");";
+      }
    } else if ( m.name ==  "Write" ) {
       js = (await func_ConvertWrite(  m,    args,    lineNumber));
    } else if ( m.name ==  "_PrintString"  |  m.name ==  "PrintString" ) {
@@ -2250,6 +2267,10 @@ var ConvertGraphicsGetPut = null;
    var coord = '';  /* STRING */ var vname = '';  /* STRING */ var action = '';  /* STRING */ 
    vname = (await String.func_Replace( (await String.func_Trim( QB.arrayValue(parts, [ 2]).value)) ,   "()" ,   ""));
    action = "undefined";
+   if ((QB.func_InStr(  vname,   "("))  > 0) {
+      await sub_AddWarning(  lineNumber,   "Graphics "  + (QB.func_UCase(  m.name))  + " with an array element is not supported; use the whole array, such as "  + (QB.func_Left(  vname,   (QB.func_InStr(  vname,   "("))  -  1))  + "()");
+      return ConvertGraphicsGetPut;
+   }
    var v = {type:'',name:'',jsname:'',isConst:0,isArray:0,arraySize:0,typeId:0};  /* VARIABLE */ 
    if (~(await func_FindVariable(  vname,    v,    False)) ) {
       if (~(await func_FindVariable(  vname,    v,    True)) ) {
@@ -3004,7 +3025,7 @@ var ConvertInput = null;
       var vartype = '';  /* STRING */ 
       vartype = (await func_GetVarType( QB.arrayValue(vars, [ i]).value));
       if ( vartype ==  "_BIT"  |  vartype ==  "_BYTE"  |  vartype ==  "INTEGER"  |  vartype ==  "LONG"  |  vartype ==  "_INTEGER64"  |  vartype ==  "_OFFSET"  |  vartype ==  "_UNSIGNED _BIT"  |  vartype ==  "_UNSIGNED _BYTE"  |  vartype ==  "_UNSIGNED INTEGER"  |  vartype ==  "_UNSIGNED LONG"  |  vartype ==  "_UNSIGNED _INTEGER64"  |  vartype ==  "_UNSIGNED _OFFSET" ) {
-         js =  js + (await func_ConvertExpression( QB.arrayValue(vars, [ i]).value ,    lineNumber))  + " = QB.toInteger("  +  vname + "["  + (QB.func_Str(  i -  1))  + "]); ";
+         js =  js + (await func_ConvertExpression( QB.arrayValue(vars, [ i]).value ,    lineNumber))  + " = QB.toInteger("  +  vname + "["  + (QB.func_Str(  i -  1))  + "]"  + (await func_ToIntegerWide(  vartype))  + "); ";
       } else if ( vartype ==  "SINGLE"  |  vartype ==  "DOUBLE"  |  vartype ==  "_FLOAT" ) {
          js =  js + (await func_ConvertExpression( QB.arrayValue(vars, [ i]).value ,    lineNumber))  + " = QB.toFloat("  +  vname + "["  + (QB.func_Str(  i -  1))  + "]); ";
       } else {
@@ -3033,20 +3054,29 @@ var ConvertFileInput = null;
    fh = (await String.func_Replace( (await String.func_Trim( QB.arrayValue(parts, [ 1]).value)) ,   "#" ,   ""));
    retvar = (await String.func_Trim( QB.arrayValue(parts, [ 2]).value));
    vname = await func_GenJSVar();
-   js = "var "  +  vname + " = new Array("  + (QB.func_Str( (QB.func_UBound(  parts))  -  1))  + "); ";
-   js =  js + (await func_CallMethod(  m))  + "("  +  fh + ", "  +  vname + "); ";
+   var assigns = '';  /* STRING */ 
+   var numeric = '';  /* STRING */ 
    var i = 0;  /* INTEGER */ 
    var ___v8279706 = 0; ___l1908614: for ( i=  2; (1 > 0) ? ( i <= (QB.func_UBound(  parts))) : ( i >= (QB.func_UBound(  parts)));  i+=1) { if (QB.halted()) { return; } ___v8279706++;   if (___v8279706 % 100 == 0) { await QB.autoLimit(); }
+      if ( i > 2) {
+         numeric =  numeric + ",";
+      }
       var vartype = '';  /* STRING */ 
       vartype = (await func_GetVarType( QB.arrayValue(parts, [ i]).value));
       if ( vartype ==  "_BIT"  |  vartype ==  "_BYTE"  |  vartype ==  "INTEGER"  |  vartype ==  "LONG"  |  vartype ==  "_INTEGER64"  |  vartype ==  "_OFFSET"  |  vartype ==  "_UNSIGNED _BIT"  |  vartype ==  "_UNSIGNED _BYTE"  |  vartype ==  "_UNSIGNED INTEGER"  |  vartype ==  "_UNSIGNED LONG"  |  vartype ==  "_UNSIGNED _INTEGER64"  |  vartype ==  "_UNSIGNED _OFFSET" ) {
-         js =  js + (await func_ConvertExpression( QB.arrayValue(parts, [ i]).value ,    lineNumber))  + " = QB.toInteger("  +  vname + "["  + (QB.func_Str(  i -  2))  + "]); ";
+         assigns =  assigns + (await func_ConvertExpression( QB.arrayValue(parts, [ i]).value ,    lineNumber))  + " = QB.toInteger("  +  vname + "["  + (QB.func_Str(  i -  2))  + "]"  + (await func_ToIntegerWide(  vartype))  + "); ";
+         numeric =  numeric + "true";
       } else if ( vartype ==  "SINGLE"  |  vartype ==  "DOUBLE"  |  vartype ==  "_FLOAT" ) {
-         js =  js + (await func_ConvertExpression( QB.arrayValue(parts, [ i]).value ,    lineNumber))  + " = QB.toFloat("  +  vname + "["  + (QB.func_Str(  i -  2))  + "]); ";
+         assigns =  assigns + (await func_ConvertExpression( QB.arrayValue(parts, [ i]).value ,    lineNumber))  + " = QB.toFloat("  +  vname + "["  + (QB.func_Str(  i -  2))  + "]); ";
+         numeric =  numeric + "true";
       } else {
-         js =  js + (await func_ConvertExpression( QB.arrayValue(parts, [ i]).value ,    lineNumber))  + " = "  +  vname + "["  + (QB.func_Str(  i -  2))  + "]; ";
+         assigns =  assigns + (await func_ConvertExpression( QB.arrayValue(parts, [ i]).value ,    lineNumber))  + " = "  +  vname + "["  + (QB.func_Str(  i -  2))  + "]; ";
+         numeric =  numeric + "false";
       }
    } 
+   js = "var "  +  vname + " = new Array("  + (QB.func_Str( (QB.func_UBound(  parts))  -  1))  + "); ";
+   js =  js + (await func_CallMethod(  m))  + "("  +  fh + ", "  +  vname + ", ["  +  numeric + "]); ";
+   js =  js +  assigns;
    ConvertFileInput =  js;
 return ConvertFileInput;
 }
@@ -3881,6 +3911,30 @@ var ParamRefEligible = null;
    ParamRefEligible =  ok;
 return ParamRefEligible;
 }
+async function func_ParamTypeMatches(m/*METHOD*/,idx/*INTEGER*/,argText/*STRING*/) {
+if (QB.halted()) { return; }; idx = QB.roundInt(idx); 
+var ParamTypeMatches = null;
+/* implicit variables: */ 
+   var ok = 0;  /* INTEGER */ 
+   ok = QB.roundInt(  True );
+   var argType = '';  /* STRING */ 
+   argType = (await func_GetVarType( (await String.func_Trim(  argText))));
+   if ( argType !=  "UNKNOWN" ) {
+      var pargs = QB.initArray([{l:0,u: 0}], '');  /* STRING */ 
+      var pp = QB.initArray([{l:0,u: 0}], '');  /* STRING */ 
+      var c = 0;  /* INTEGER */ 
+      var v = 0;  /* INTEGER */ 
+      c = QB.roundInt( (await func_Split(  m.args,   "," ,   pargs)) );
+      if ( idx >=  1 &  idx <=  c) {
+         v = QB.roundInt( (await func_Split( QB.arrayValue(pargs, [ idx]).value ,   ":" ,   pp)) );
+         if ((await func_NormalizeType(  argType))  !=  (await func_NormalizeType( QB.arrayValue(pp, [ 2]).value)) ) {
+            ok = QB.roundInt(  False );
+         }
+      }
+   }
+   ParamTypeMatches =  ok;
+return ParamTypeMatches;
+}
 async function func_IsLvalueArg(text/*STRING*/) {
 if (QB.halted()) { return; }; 
 var IsLvalueArg = null;
@@ -3981,7 +4035,7 @@ var ConvertMethodParamsRef = null;
          var refd = 0;  /* INTEGER */ 
          refd = QB.roundInt(  False );
          if ((await func_ParamRefEligible(  m,    i)) ) {
-            if ((await func_IsLvalueArg( QB.arrayValue(params, [ i]).value)) ) {
+            if ((await func_IsLvalueArg( QB.arrayValue(params, [ i]).value))  && (await func_ParamTypeMatches(  m,    i,   QB.arrayValue(params, [ i]).value)) ) {
                var target = '';  /* STRING */ 
                var dotPos = 0;  /* INTEGER */ 
                var refName = '';  /* STRING */ 
@@ -4574,6 +4628,7 @@ if (QB.halted()) { return; };
    var i = 0;  /* INTEGER */ 
    var pcount = 0;  /* INTEGER */ 
    var rawJS = 0;  /* INTEGER */ 
+   var ifSkip = 0;  /* INTEGER */ 
    var parts = QB.initArray([{l:0,u: 0}], '');  /* STRING */ 
    var ___v2321104 = 0; ___l3999795: for ( i=  1; (1 > 0) ? ( i <= (QB.func_UBound(  lines))) : ( i >= (QB.func_UBound(  lines)));  i+=1) { if (QB.halted()) { return; } ___v2321104++;   if (___v2321104 % 100 == 0) { await QB.autoLimit(); }
       pcount = QB.roundInt( (await func_Split( QB.arrayValue(lines, [ i]).value .text,   " " ,   parts)) );
@@ -4590,13 +4645,24 @@ if (QB.halted()) { return; };
       if ( rawJS) {
          continue;
       }
+      if ( ifSkip) {
+         if ((QB.func_Left(  word,    4))  ==  "$END" ) {
+            ifSkip = QB.roundInt(  False );
+         }
+      } else if ( word ==  "$ELSE"  |  word ==  "$ELSEIF" ) {
+         ifSkip = QB.roundInt(  True );
+      } else if ( word ==  "$IF"  &  pcount > 1) {
+         if ((QB.func_UCase( QB.arrayValue(parts, [ 2]).value))  !=  "WEB" ) {
+            ifSkip = QB.roundInt(  True );
+         }
+      }
       defCurLine = QB.roundInt(  i );
-      if ( word ==  "$BYREF"  &  pcount > 1) {
+      if ( word ==  "$BYREF"  &  pcount > 1 & ~ ifSkip) {
          if ((QB.func_UCase( QB.arrayValue(parts, [ 2]).value))  ==  "ON" ) {
             byRefMeta = QB.roundInt(  True );
          }
       }
-      if ( word ==  "DEFINT"  |  word ==  "DEFLNG"  |  word ==  "DEFSNG"  |  word ==  "DEFDBL"  |  word ==  "DEFSTR"  |  word ==  "_DEFINE" ) {
+      if (( word ==  "DEFINT"  |  word ==  "DEFLNG"  |  word ==  "DEFSNG"  |  word ==  "DEFDBL"  |  word ==  "DEFSTR"  |  word ==  "_DEFINE")  & ~ ifSkip) {
          await sub_RegisterDefType(  i,    word,   (await func_Join( parts ,    2,    - 1,   " ")));
       }
       if ( word ==  "FUNCTION"  |  word ==  "SUB" ) {

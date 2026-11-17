@@ -404,7 +404,10 @@ End Sub
 
 ' The compiler option for passing a variable, an array element or a TYPE member to a procedure's
 ' parameter by reference, as QB does, done as copy in and copy out. The $BYREF ON metacommand does
-' the same for the module it is in.
+' the same for the module it is in. Because the value is copied back only when the call ends, two
+' names for one variable do not see each other's changes during the call: a variable passed twice
+' (Swap2 a, a), or a SHARED variable that the procedure also changes by its own name. The copy
+' copied back last wins.
 Sub SetByRef ()
     optionByRef = True
 End Sub
@@ -1130,6 +1133,12 @@ Function RoundFunction$ (typeName As String)
     End If
 End Function
 
+' The extra argument of QB.toInteger for a LONG or a wider integer, which INPUT rounds as QB.roundLong does
+Function ToIntegerWide$ (typeName As String)
+    ToIntegerWide = ""
+    If RoundFunction(typeName) = "QB.roundLong" Then ToIntegerWide = ", true"
+End Function
+
 Function IsValidVarname (varname As String)
     Dim As String vname, s
     Dim As Integer i, c, valid
@@ -1406,7 +1415,15 @@ Function ConvertSub$ (m As Method, args As String, lineNumber As Integer)
         js = CallMethod(m) + "(" + ConvertWindow(args, lineNumber) + ");"
 
     ElseIf m.name = "View" Then
-        js = CallMethod(m) + "(" + ConvertView(args, lineNumber) + ");"
+        Dim viewArgs As String
+        viewArgs = UCase$(String.Trim(args))
+        If viewArgs = "PRINT" Or String.StartsWith(viewArgs, "PRINT ") Then
+            ' VIEW PRINT, the text view port, is not supported yet
+            js = "// View " + args
+            AddWarning lineNumber, "Missing or unsupported method: 'VIEW PRINT' - ignoring line"
+        Else
+            js = CallMethod(m) + "(" + ConvertView(args, lineNumber) + ");"
+        End If
 
     ElseIf m.name = "Write" Then
         js = ConvertWrite(m, args, lineNumber)
@@ -1443,6 +1460,12 @@ Function ConvertGraphicsGetPut$ (m As Method, parts() As String, argc As Integer
     Dim As String coord, vname, action
     vname = String.Replace(String.Trim(parts(2)), "()", "")
     action = "undefined"
+
+    ' an image is kept on the array object, so an element such as sprite(500) cannot hold one
+    If InStr(vname, "(") > 0 Then
+        AddWarning lineNumber, "Graphics " + UCase$(m.name) + " with an array element is not supported; use the whole array, such as " + Left$(vname, InStr(vname, "(") - 1) + "()"
+        Exit Function
+    End If
 
     Dim v As Variable
     If Not FindVariable(vname, v, False) Then
@@ -2172,7 +2195,7 @@ Function ConvertInput$ (m As Method, args As String, lineNumber As Integer)
         vartype = GetVarType(vars(i))
         If vartype = "_BIT" Or vartype = "_BYTE" Or vartype = "INTEGER" Or vartype = "LONG" Or vartype = "_INTEGER64" Or vartype = "_OFFSET" Or _
            vartype = "_UNSIGNED _BIT" Or vartype = "_UNSIGNED _BYTE" Or vartype = "_UNSIGNED INTEGER" Or vartype = "_UNSIGNED LONG" Or vartype = "_UNSIGNED _INTEGER64" Or vartype = "_UNSIGNED _OFFSET" Then
-            js = js + ConvertExpression(vars(i), lineNumber) + " = QB.toInteger(" + vname + "[" + Str$(i - 1) + "]); "
+            js = js + ConvertExpression(vars(i), lineNumber) + " = QB.toInteger(" + vname + "[" + Str$(i - 1) + "]" + ToIntegerWide(vartype) + "); "
         ElseIf vartype = "SINGLE" Or vartype = "DOUBLE" Or vartype = "_FLOAT" Then
             js = js + ConvertExpression(vars(i), lineNumber) + " = QB.toFloat(" + vname + "[" + Str$(i - 1) + "]); "
         Else
@@ -2202,23 +2225,32 @@ Function ConvertFileInput$ (m As Method, args As String, lineNumber As Integer)
     retvar = String.Trim(parts(2))
 
     vname = GenJSVar
-    js = "var " + vname + " = new Array(" + Str$(UBound(parts) - 1) + "); "
-    js = js + CallMethod(m) + "(" + fh + ", " + vname + "); "
 
+    ' numeric lists, for each variable, whether it is a number: a number's field also ends at a space
+    Dim assigns As String
+    Dim numeric As String
     Dim i As Integer
     For i = 2 To UBound(parts)
+        If i > 2 Then numeric = numeric + ","
         ' Convert to appropriate variable type on assignment
         Dim vartype As String
         vartype = GetVarType(parts(i))
         If vartype = "_BIT" Or vartype = "_BYTE" Or vartype = "INTEGER" Or vartype = "LONG" Or vartype = "_INTEGER64" Or vartype = "_OFFSET" Or _
            vartype = "_UNSIGNED _BIT" Or vartype = "_UNSIGNED _BYTE" Or vartype = "_UNSIGNED INTEGER" Or vartype = "_UNSIGNED LONG" Or vartype = "_UNSIGNED _INTEGER64" Or vartype = "_UNSIGNED _OFFSET" Then
-            js = js + ConvertExpression(parts(i), lineNumber) + " = QB.toInteger(" + vname + "[" + Str$(i - 2) + "]); "
+            assigns = assigns + ConvertExpression(parts(i), lineNumber) + " = QB.toInteger(" + vname + "[" + Str$(i - 2) + "]" + ToIntegerWide(vartype) + "); "
+            numeric = numeric + "true"
         ElseIf vartype = "SINGLE" Or vartype = "DOUBLE" Or vartype = "_FLOAT" Then
-            js = js + ConvertExpression(parts(i), lineNumber) + " = QB.toFloat(" + vname + "[" + Str$(i - 2) + "]); "
+            assigns = assigns + ConvertExpression(parts(i), lineNumber) + " = QB.toFloat(" + vname + "[" + Str$(i - 2) + "]); "
+            numeric = numeric + "true"
         Else
-            js = js + ConvertExpression(parts(i), lineNumber) + " = " + vname + "[" + Str$(i - 2) + "]; "
+            assigns = assigns + ConvertExpression(parts(i), lineNumber) + " = " + vname + "[" + Str$(i - 2) + "]; "
+            numeric = numeric + "false"
         End If
     Next i
+
+    js = "var " + vname + " = new Array(" + Str$(UBound(parts) - 1) + "); "
+    js = js + CallMethod(m) + "(" + fh + ", " + vname + ", [" + numeric + "]); "
+    js = js + assigns
 
     ConvertFileInput = js
 End Function
@@ -3036,6 +3068,28 @@ Function ParamRefEligible (m As Method, idx As Integer)
     ParamRefEligible = ok
 End Function
 
+' True unless the argument's type is known and differs from the idx-th parameter's type. QB64 passes
+' an argument of another type, such as a SINGLE to an INTEGER parameter, as a copy, so the procedure
+' cannot change it.
+Function ParamTypeMatches (m As Method, idx As Integer, argText As String)
+    Dim ok As Integer
+    ok = True
+    Dim argType As String
+    argType = GetVarType(String.Trim(argText))
+    If argType <> "UNKNOWN" Then
+        ReDim As String pargs(0)
+        ReDim As String pp(0)
+        Dim c As Integer
+        Dim v As Integer
+        c = Split(m.args, ",", pargs())
+        If idx >= 1 And idx <= c Then
+            v = Split(pargs(idx), ":", pp())
+            If NormalizeType(argType) <> NormalizeType(pp(2)) Then ok = False
+        End If
+    End If
+    ParamTypeMatches = ok
+End Function
+
 ' True when an argument's text names something that can be assigned to: a variable, an array element or
 ' a TYPE member, such as n, n$, a(i), p.x or a(i).x. A constant, an expression, an argument in its own
 ' parentheses, a whole array (a()) and a function call are not.
@@ -3125,7 +3179,7 @@ Function ConvertMethodParamsRef$ (m As Method, args As String, lineNumber As Int
             Dim refd As Integer
             refd = False
             If ParamRefEligible(m, i) Then
-                If IsLvalueArg(params(i)) Then
+                If IsLvalueArg(params(i)) AndAlso ParamTypeMatches(m, i, params(i)) Then
                     Dim target As String
                     Dim dotPos As Integer
                     Dim refName As String
@@ -3739,6 +3793,7 @@ Sub FindMethods
     Dim i As Integer
     Dim pcount As Integer
     Dim rawJS As Integer
+    Dim ifSkip As Integer
     ReDim As String parts(0)
     For i = 1 To UBound(lines)
         pcount = Split(lines(i).text, " ", parts())
@@ -3751,11 +3806,21 @@ Sub FindMethods
         If Left$(word, 4) = "$END" And rawJS Then rawJS = False
         If rawJS Then _Continue
 
+        ' Skip the lines that ConvertLines skips: an $IF other than $IF WEB up to its $END, and
+        ' from an $ELSE or $ELSEIF to the $END. Only the $BYREF and DEF lines below follow this.
+        If ifSkip Then
+            If Left$(word, 4) = "$END" Then ifSkip = False
+        ElseIf word = "$ELSE" Or word = "$ELSEIF" Then
+            ifSkip = True
+        ElseIf word = "$IF" And pcount > 1 Then
+            If UCase$(parts(2)) <> "WEB" Then ifSkip = True
+        End If
+
         defCurLine = i
-        If word = "$BYREF" And pcount > 1 Then
+        If word = "$BYREF" And pcount > 1 And Not ifSkip Then
             If UCase$(parts(2)) = "ON" Then byRefMeta = True
         End If
-        If word = "DEFINT" Or word = "DEFLNG" Or word = "DEFSNG" Or word = "DEFDBL" Or word = "DEFSTR" Or word = "_DEFINE" Then
+        If (word = "DEFINT" Or word = "DEFLNG" Or word = "DEFSNG" Or word = "DEFDBL" Or word = "DEFSTR" Or word = "_DEFINE") And Not ifSkip Then
             RegisterDefType i, word, Join(parts(), 2, -1, " ")
         End If
 

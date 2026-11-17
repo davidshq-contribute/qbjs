@@ -336,11 +336,13 @@ var QB = new function() {
         this.value = value;
     };
 
-    this.toInteger = function(value) {
+    // wide is true for a LONG or a wider integer, which is rounded from the double (QB.roundLong)
+    this.toInteger = function(value, wide) {
         if (_roundHalfEven) {
             // like QB, INPUT into an integer rounds the number it reads
             var n = parseFloat(value);
-            return isNaN(n) ? 0 : QB.roundInt(n);
+            if (isNaN(n)) { return 0; }
+            return wide ? QB.roundLong(n) : QB.roundInt(n);
         }
         var result = parseInt(value);
         if (isNaN(result)) {
@@ -443,6 +445,12 @@ var QB = new function() {
         _fonts[16] = { name: "dosvga", size: "16px", style: "", offset: 4, monospace: true, height: 16, width: 8 };
         GX.vfsCwd(GX.vfs().rootDirectory());
         _fileHandles = {};
+        // a run starts with QBJS's rounding, no view port and an empty PEEK and POKE memory
+        _roundHalfEven = false;
+        _viewport = undefined;
+        _viewportWarned = false;
+        _defSeg = 0;
+        _peekPokeMemory = {};
         _initColorTable();
         GX._enableTouchMouse(true);
         GX.registerGameEvents(function(e){});
@@ -2409,7 +2417,8 @@ var QB = new function() {
         }
     }
 
-    this.sub_InputFromFile = async function(fh, returnValues) {
+    // numeric says, for each variable, whether it is a number
+    this.sub_InputFromFile = async function(fh, returnValues, numeric) {
         if (!_fileHandles[fh]) {
             throw new Error("Invalid file handle");
         }
@@ -2420,7 +2429,9 @@ var QB = new function() {
         fh = _fileHandles[fh];
         // Like QB, read one field for each variable, from where the last INPUT # stopped. A field ends at a
         // comma or at the end of a line, and that one delimiter is taken with it, so a statement with more
-        // variables than the line has fields goes on to the next line.
+        // variables than the line has fields goes on to the next line. A number's field also ends at a
+        // space; the spaces after it are skipped, then a comma or a line ending is taken, so " 1  2  3 "
+        // gives three numbers.
         var view = new Uint8Array(fh.file.data);
         var pos = fh.offset;
         var n = view.length;
@@ -2438,6 +2449,10 @@ var QB = new function() {
                 while (pos < n && view[pos] != 34 && view[pos] != 13 && view[pos] != 10) { v += String.fromCharCode(view[pos]); pos++; }
                 if (pos < n && view[pos] == 34) { pos++; }
                 while (pos < n && view[pos] != 44 && view[pos] != 13 && view[pos] != 10) { pos++; }
+            }
+            else if (numeric && numeric[i]) {
+                while (pos < n && view[pos] != 32 && view[pos] != 44 && view[pos] != 13 && view[pos] != 10) { v += String.fromCharCode(view[pos]); pos++; }
+                while (pos < n && view[pos] == 32) { pos++; }
             }
             else {
                 while (pos < n && view[pos] != 44 && view[pos] != 13 && view[pos] != 10) { v += String.fromCharCode(view[pos]); pos++; }
@@ -2902,13 +2917,26 @@ var QB = new function() {
         var vfs = GX.vfs();
         var vfsCwd = GX.vfsCwd();
         var node = vfs.getNode(oldName, vfsCwd);
-        var oldPath = vfs.fullPath(node);
+        // a folder takes the files and folders under it along, so each of them is saved under its new path
+        var moved = [];
+        if (_persistDb) { _persistCollect(node, moved); }
         vfs.renameNode(node, newName);
-        if (_persistDb) {
-            _persistDelete(oldPath);
-            if (node.type == vfs.FILE) { _persistPut(vfs.fullPath(node), { data: node.data }); }
+        for (var i=0; i < moved.length; i++) {
+            _persistDelete(moved[i].oldPath);
+            var n = moved[i].node;
+            _persistPut(vfs.fullPath(n), n.type == vfs.FILE ? { data: n.data } : { dir: true });
         }
     };
+
+    // Lists a node and, for a folder, every node under it, each with its current path.
+    function _persistCollect(node, list) {
+        var vfs = GX.vfs();
+        list.push({ node: node, oldPath: vfs.fullPath(node) });
+        if (node.type == vfs.DIRECTORY) {
+            var children = vfs.getChildren(node);
+            for (var i=0; i < children.length; i++) { _persistCollect(children[i], list); }
+        }
+    }
 
     this.func_Oct = function(n) {
         n = _assertNumber(n);
@@ -3989,6 +4017,8 @@ var QB = new function() {
 
     this.sub_Screen = function(mode) {
         _activeImage = 0;
+        // a new screen has no view port, as in QB64
+        _viewport = undefined;
 
         if (_currScreenImage) {
             _images[_currScreenImage.id] = _currScreenImage;

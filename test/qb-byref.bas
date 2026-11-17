@@ -31,6 +31,12 @@ s = "ab"
 BrAddStr s
 UT.AssertEquals s, "abx"
 
+' a variable of another type is passed as a copy, as QB64 does: a SINGLE to an INTEGER parameter
+Dim sg As Single
+sg = 2.7
+BrBump sg
+UT.AssertEquals sg, 2.7
+
 ' an argument in its own parentheses, an expression and a constant are passed by value
 BrBump (a)
 UT.AssertEquals a, 3
