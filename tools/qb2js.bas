@@ -2058,7 +2058,9 @@ Function ConvertWrite$ (m As Method, args As String, lineNumber As Integer)
             t = "STRING"
         End If
 
-        If isVar Then
+        If isVar Or t = "UNKNOWN" Then
+            ' a variable, or an expression such as an array element or a number: its value is written,
+            ' and a string value is quoted when it is written (_getWriteString)
             js = js + "{ type:'" + t + "', value:" + String.Trim(ConvertExpression(parts(i), lineNumber)) + "}"
         Else
             js = js + "{ type:'" + t + "', value:'" + String.Replace(String.Trim(ConvertExpression(parts(i), lineNumber)), "'", "\'") + "'}"

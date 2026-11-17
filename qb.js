@@ -4365,7 +4365,7 @@ var QB = new function() {
             if (i > 0) {
                 output += ","
             }
-            if (args[i].type == "STRING" && !args[i].value.startsWith('"')) {
+            if ((args[i].type == "STRING" || (args[i].type == "UNKNOWN" && typeof args[i].value == "string")) && !args[i].value.startsWith('"')) {
                 output += "\"" + args[i].value + "\"";
             }
             else {

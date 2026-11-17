@@ -2892,7 +2892,7 @@ var ConvertWrite = null;
       } else if ((await String.func_StartsWith( QB.arrayValue(parts, [ i]).value ,   (QB.func_Chr(  34)))) ) {
          t = "STRING";
       }
-      if ( isVar) {
+      if ( isVar |  t ==  "UNKNOWN" ) {
          js =  js + "{ type:'"  +  t + "', value:"  + (await String.func_Trim( (await func_ConvertExpression( QB.arrayValue(parts, [ i]).value ,    lineNumber))))  + "}";
       } else {
          js =  js + "{ type:'"  +  t + "', value:'"  + (await String.func_Replace( (await String.func_Trim( (await func_ConvertExpression( QB.arrayValue(parts, [ i]).value ,    lineNumber)))) ,   "'" ,   "\\'"))  + "'}";

@@ -163,6 +163,15 @@ Line Input #1, opLine
 Close #1
 UT.AssertEquals opLine, "two"
 
+' WRITE # of an array element, a number and a string expression writes their values
+Dim wrArr(2) As Integer, wrName As String
+wrArr(1) = 7: wrArr(2) = -3: wrName = "ab"
+Open "test.txt" For Output As #1
+Write #1, wrArr(1), wrArr(2), 5, wrName + "c", wrName
+Close #1
+UT.AssertEquals FS.ReadText("test.txt"), "7,-3,5,""abc"",""ab""" + CRLF
+Kill "test.txt"
+
 ' INPUT # into an integer: QBJS cuts off the fraction; $ROUNDING EVEN rounds as QB does (3.5 to 4, 2.5 to 2)
 Dim inA%, inB%, inC&
 Open "test.txt" For Output As #1
