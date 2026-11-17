@@ -237,4 +237,19 @@ $ROUNDING UP
 UT.AssertEquals inBig&, 16777217
 Kill "test.txt"
 
+' an array parameter named with a type suffix has that type: INPUT # into names$() reads text, not NaN
+Dim apNames$(2), apCounts%(2)
+Open "test.txt" For Output As #1
+Write #1, "Lee", 2.6
+Close #1
+ArrayParamLoad apNames$(), apCounts%()
+UT.AssertEquals apNames$(1), "Lee"
+UT.AssertEquals apCounts%(1), 2
+Kill "test.txt"
+Sub ArrayParamLoad (names$(), counts%())
+    Open "test.txt" For Input As #1
+    Input #1, names$(1), counts%(1)
+    Close #1
+End Sub
+
 Console.Echo "QB File I/O - tests completed with no errors* in " + (Sys.TimeInMillis - ts) + " millisecond(s)"

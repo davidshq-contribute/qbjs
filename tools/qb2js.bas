@@ -3880,7 +3880,8 @@ Sub FindMethods
                         'args = args + argname + ":" + UCase$(aparts(3)) + ":" + isArray
                         args = args + argname + ":" + typeName + ":" + isArray
                     Else
-                        args = args + argname + ":" + DataTypeFromName(aparts(1)) + ":" + isArray
+                        ' The type comes from the suffix of the name, not of the "()": names$() is a STRING array
+                        args = args + argname + ":" + DataTypeFromName(argname) + ":" + isArray
                     End If
                     If a <> m.argc Then
                         args = args + ","

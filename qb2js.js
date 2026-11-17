@@ -4717,7 +4717,7 @@ if (QB.halted()) { return; };
                   }
                   args =  args +  argname + ":"  +  typeName + ":"  +  isArray;
                } else {
-                  args =  args +  argname + ":"  + (await func_DataTypeFromName( QB.arrayValue(aparts, [ 1]).value))  + ":"  +  isArray;
+                  args =  args +  argname + ":"  + (await func_DataTypeFromName(  argname))  + ":"  +  isArray;
                }
                if ( a !=   m.argc) {
                   args =  args + ",";
