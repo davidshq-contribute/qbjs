@@ -1401,6 +1401,9 @@ if (QB.halted()) { return; }; firstLine = Math.round(firstLine); lastLine = Math
                } else {
                   var cleft = '';  /* STRING */ var cright = '';  /* STRING */ 
                   cleft = (QB.func_Left( QB.arrayValue(constParts, [ constIdx]).value ,    eqi -  1));
+                  if ((await func_RemoveSuffix(  cleft))  !=  (await String.func_Trim(  cleft)) ) {
+                     cleft = (await func_RemoveSuffix(  cleft))  + " ";
+                  }
                   cright = (QB.func_Mid( QB.arrayValue(constParts, [ constIdx]).value ,    eqi +  1));
                   if ( functionName ==  "" ) {
                      QB.arrayValue(jsLines, [ constVarLine]).value .text = QB.arrayValue(jsLines, [ constVarLine]).value .text + "const "  +  cleft + " = "  + (await func_ConvertExpression(  cright,    i))  + "; ";
@@ -2213,23 +2216,49 @@ var ConvertOpen = null;
    var parts = QB.initArray([{l:0,u: 0}], '');  /* STRING */ 
    var filename = '';  /* STRING */ var mode = '';  /* STRING */ var handle = '';  /* STRING */ 
    argc = Math.round( (await func_SLSplit(  args,   parts ,    False)) );
-   if ( argc < 5) {
-      await sub_AddWarning(  lineNumber,   "Syntax Error in Open statement");
-      return ConvertOpen;
-   }
-   if ((QB.func_UCase( QB.arrayValue(parts, [ 2]).value))  !=  "FOR" ) {
-      await sub_AddWarning(  lineNumber,   "Syntax Error in Open statement");
+   if ( argc < 5 || (QB.func_UCase( QB.arrayValue(parts, [ 2]).value))  !=  "FOR" ) {
+      ConvertOpen = (await func_ConvertOpenOriginal(  args,    lineNumber));
       return ConvertOpen;
    }
    if ((QB.func_UCase( QB.arrayValue(parts, [ 4]).value))  !=  "AS" ) {
       await sub_AddWarning(  lineNumber,   "Syntax Error in Open statement");
       return ConvertOpen;
    }
-   filename = QB.arrayValue(parts, [ 1]).value;
+   filename = (await String.func_Trim( (await func_ConvertExpression( QB.arrayValue(parts, [ 1]).value ,    lineNumber))));
    mode = "QB."  + (QB.func_UCase( QB.arrayValue(parts, [ 3]).value));
-   handle = (await String.func_Replace( QB.arrayValue(parts, [ 5]).value ,   "#" ,   ""));
+   handle = (await String.func_Trim( (await func_ConvertExpression( (await String.func_Replace( QB.arrayValue(parts, [ 5]).value ,   "#" ,   "")) ,    lineNumber))));
    ConvertOpen =  filename + ", "  +  mode + ", "  +  handle;
 return ConvertOpen;
+}
+async function func_ConvertOpenOriginal(args/*STRING*/,lineNumber/*INTEGER*/) {
+if (QB.halted()) { return; }; lineNumber = Math.round(lineNumber); 
+var ConvertOpenOriginal = null;
+/* implicit variables: */ 
+   var argc = 0;  /* INTEGER */ 
+   var parts = QB.initArray([{l:0,u: 0}], '');  /* STRING */ 
+   var mode = '';  /* STRING */ var umode = '';  /* STRING */ 
+   argc = Math.round( (await func_ListSplit(  args,   parts)) );
+   umode = (QB.func_UCase( (await String.func_Trim( QB.arrayValue(parts, [ 1]).value))));
+   if ( argc < 3) {
+      await sub_AddWarning(  lineNumber,   "Syntax Error in Open statement");
+      return ConvertOpenOriginal;
+   }
+   if ( umode ==  (QB.func_Chr(  34))  + "I"  + (QB.func_Chr(  34)) ) {
+      mode = "QB.INPUT";
+   } else if ( umode ==  (QB.func_Chr(  34))  + "O"  + (QB.func_Chr(  34)) ) {
+      mode = "QB.OUTPUT";
+   } else if ( umode ==  (QB.func_Chr(  34))  + "A"  + (QB.func_Chr(  34)) ) {
+      mode = "QB.APPEND";
+   } else if ( umode ==  (QB.func_Chr(  34))  + "R"  + (QB.func_Chr(  34)) ) {
+      mode = "QB.RANDOM";
+   } else if ( umode ==  (QB.func_Chr(  34))  + "B"  + (QB.func_Chr(  34)) ) {
+      mode = "QB.BINARY";
+   } else {
+      await sub_AddWarning(  lineNumber,   "Syntax Error in Open statement");
+      return ConvertOpenOriginal;
+   }
+   ConvertOpenOriginal = (await String.func_Trim( (await func_ConvertExpression( QB.arrayValue(parts, [ 3]).value ,    lineNumber))))  + ", "  +  mode + ", "  + (await String.func_Trim( (await func_ConvertExpression( (await String.func_Replace( QB.arrayValue(parts, [ 2]).value ,   "#" ,   "")) ,    lineNumber))));
+return ConvertOpenOriginal;
 }
 async function func_ConvertLine(args/*STRING*/,lineNumber/*INTEGER*/) {
 if (QB.halted()) { return; }; lineNumber = Math.round(lineNumber); 
@@ -2561,7 +2590,9 @@ var ConvertPSet = null;
    if (((await String.func_Trim(  firstParam))  ==  "") ) {
       firstParam = "undefined, undefined";
    }
-   theRest = (await func_ConvertExpression(  theRest,    lineNumber));
+   if ((await String.func_Trim(  theRest))  !=  "" ) {
+      theRest = (await func_ConvertMethodParams(  theRest,    lineNumber));
+   }
    ConvertPSet =  sstep + ", "  +  firstParam + ", "  +  theRest;
 return ConvertPSet;
 }
@@ -2594,6 +2625,7 @@ var ConvertPrint = null;
    }
    js =  js + "[";
    var i = 0;  /* INTEGER */ var usingMode = 0;  /* INTEGER */ 
+   var item = '';  /* STRING */ 
    var ___v7915529 = 0; ___l2245664: for ( i=  startIdx; (1 > 0) ? ( i <=  pcount) : ( i >=  pcount);  i+=1) { if (QB.halted()) { return; } ___v7915529++;   if (___v7915529 % 100 == 0) { await QB.autoLimit(); }
       if ( i > startIdx && ~ usingMode) {
          js =  js + ",";
@@ -2626,7 +2658,14 @@ var ConvertPrint = null;
             js =  js + "QB.PREVENT_NEWLINE";
          }
       } else {
-         js =  js + (await func_ConvertExpression( QB.arrayValue(parts, [ i]).value ,    lineNumber));
+         item = (await String.func_Trim( QB.arrayValue(parts, [ i]).value));
+         if ((QB.func_UCase( (QB.func_Left(  item,    4))))  ==  "TAB("  & (QB.func_Right(  item,    1))  ==  ")" ) {
+            js =  js + "QB.tab("  + (await func_ConvertExpression( (QB.func_Mid(  item,    5,   (QB.func_Len(  item))  -  5)) ,    lineNumber))  + ")";
+         } else if ((QB.func_UCase( (QB.func_Left(  item,    4))))  ==  "SPC("  & (QB.func_Right(  item,    1))  ==  ")" ) {
+            js =  js + "QB.spc("  + (await func_ConvertExpression( (QB.func_Mid(  item,    5,   (QB.func_Len(  item))  -  5)) ,    lineNumber))  + ")";
+         } else {
+            js =  js + (await func_ConvertExpression( QB.arrayValue(parts, [ i]).value ,    lineNumber));
+         }
       }
    } 
    if ( usingMode) {

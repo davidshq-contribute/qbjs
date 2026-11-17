@@ -24,6 +24,30 @@ Close #1
 UT.AssertEquals FS.ReadText("test.txt"), "n= 42 "
 Kill "test.txt"
 
+' the file name and the handle of OPEN are expressions
+Dim fname As String, fnum As Integer
+fname = "test.txt": fnum = 2
+Open fname For Output As #fnum
+Print #fnum, "named by variables"
+Close #fnum
+UT.AssertEquals FS.ReadText("test.txt"), "named by variables" + CRLF
+Kill "test.txt"
+
+' the original form of OPEN: a mode of I, O or A, then the handle, then the file
+Open "O", 1, "test.txt"
+Print #1, "first"
+Close #1
+Open "A", #1, "test" + ".txt"
+Print #1, "second"
+Close #1
+UT.AssertEquals FS.ReadText("test.txt"), "first" + CRLF + "second" + CRLF
+Dim original As String
+Open "I", 1, "test.txt"
+Line Input #1, original
+Close #1
+UT.AssertEquals original, "first"
+Kill "test.txt"
+
 Open "test.txt" For Output As #1
 Print #1, "This is the first line."
 Print #1, "This is the second line."
@@ -33,6 +57,32 @@ Open "test.txt" For Input As #1
 Line Input #1, st
 Close #1
 UT.AssertEquals st, "This is the first line."
+Kill "test.txt"
+
+' TAB and SPC in a file: TAB moves to a column (the first is 1), and to the next line when it is past it
+Open "test.txt" For Output As #1
+Print #1, Tab(5); "a"; Tab(8); "b"; Spc(2); "c"
+Print #1, "wxyz"; Tab(3); "d"
+Close #1
+UT.AssertEquals FS.ReadText("test.txt"), "    a  b  c" + CRLF + "wxyz" + CRLF + "  d" + CRLF
+Kill "test.txt"
+
+' each line of a file with CRLF line endings is read in turn
+Open "test.txt" For Output As #1
+Print #1, "one"
+Print #1, "two"
+Print #1, "three"
+Close #1
+Dim crlfLine As String
+Open "test.txt" For Input As #1
+Line Input #1, crlfLine
+UT.AssertEquals crlfLine, "one"
+Line Input #1, crlfLine
+UT.AssertEquals crlfLine, "two"
+Line Input #1, crlfLine
+UT.AssertEquals crlfLine, "three"
+UT.AssertTrue EOF(1)
+Close #1
 Kill "test.txt"
 
 Open "test.txt" For Output As #1

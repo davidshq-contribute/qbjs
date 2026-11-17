@@ -175,6 +175,27 @@ var QB = new function() {
     // QB constants
     this.COLUMN_ADVANCE = Symbol("COLUMN_ADVANCE");
     this.PREVENT_NEWLINE = Symbol("PREVENT_NEWLINE");
+
+    // TAB(n) and SPC(n) are items of a PRINT list. The text they print depends on the column
+    // at the moment they are reached, so the list holds a marker and the print methods resolve it.
+    this.tab = function(column) {
+        return { __tab: _assertNumber(column) };
+    };
+    this.spc = function(count) {
+        return { __spc: _assertNumber(count) };
+    };
+    function _isTabSpc(item) {
+        return item !== null && typeof item == "object" && (item.__tab !== undefined || item.__spc !== undefined);
+    }
+    // The text for a marker when the cursor is at column col (0 is the first). TAB moves to the
+    // column given (1 is the first); when the cursor is past it, to that column of the next line.
+    function _tabSpcText(item, col, newline) {
+        if (item.__spc !== undefined) {
+            return " ".repeat(Math.max(0, Math.round(item.__spc)));
+        }
+        var target = Math.max(0, Math.round(item.__tab) - 1);
+        return target < col ? newline + " ".repeat(target) : " ".repeat(target - col);
+    }
     this.STRETCH = Symbol("STRETCH");
     this.SQUAREPIXELS = Symbol("SQUAREPIXELS");
     this.APPEND = Symbol("APPEND");
@@ -2561,7 +2582,11 @@ var QB = new function() {
 
         fh = _fileHandles[fh];
         var text = GX.vfs().readLine(fh.file, fh.offset);
-        fh.offset += text.length + 1;
+        // readLine drops a carriage return, so move past the line feed itself rather than by text.length + 1
+        var view = new Uint8Array(fh.file.data);
+        var next = fh.offset;
+        while (next < view.length && view[next] != 10) { next++; }
+        fh.offset = next + 1;
         returnValues[0] = text;
     };
 
@@ -2942,6 +2967,7 @@ var QB = new function() {
             throw new Error("Bad file mode");
         }
         var locX = 0;
+        var col = _fileHandles[fh].col || 0;
         var file = _fileHandles[fh].file;
         if (!file) { 
             throw new Error("Invalid file handle");
@@ -2965,9 +2991,13 @@ var QB = new function() {
                 padStr = padStr.padStart(chars, " ");
                 GX.vfs().writeText(file, padStr);
                 locX += chars;
+                col += chars;
             }
             else {
                 var str = args[ai];
+                if (_isTabSpc(str)) {
+                    str = _tabSpcText(str, col, "\r\n");
+                }
                 // non-negative numbers are prefixed with a space
                 if (typeof str != "string" && !isNaN(str)) {
                     if (str >= 0) {
@@ -2976,13 +3006,16 @@ var QB = new function() {
                     str = str + " "; //a space is added to the end numbers when printing
                 }
                 locX = str.length;
+                col = str.indexOf("\n") >= 0 ? str.length - str.lastIndexOf("\n") - 1 : col + str.length;
                 GX.vfs().writeText(file, str);
             }
         }
 
         if (!preventNewline) {
             GX.vfs().writeText(file, "\r\n");
+            col = 0;
         }
+        _fileHandles[fh].col = col;
     };
 
     this.sub_Print = async function(args) {
@@ -3010,6 +3043,9 @@ var QB = new function() {
             }
             else {
                 var str = args[ai];
+                if (_isTabSpc(str)) {
+                    str = _tabSpcText(str, _locX, "\n");
+                }
                 // non-negative numbers are prefixed with a space
                 if (typeof str != "string" && !isNaN(str)) {
                     if (str >= 0) {

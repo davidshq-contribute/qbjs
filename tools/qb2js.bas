@@ -546,6 +546,8 @@ Sub ConvertLines (firstLine As Integer, lastLine As Integer, functionName As Str
                     Else
                         Dim As String cleft, cright
                         cleft = Left$(constParts(constIdx), eqi - 1)
+                        ' Const names are looked up without their type suffix (FindVariable), so remove it here
+                        If RemoveSuffix(cleft) <> String.Trim(cleft) Then cleft = RemoveSuffix(cleft) + " "
                         cright = Mid$(constParts(constIdx), eqi + 1)
                         If functionName = "" Then
                             jsLines(constVarLine).text = jsLines(constVarLine).text + "const " + cleft + " = " + ConvertExpression(cright, i) + "; "
@@ -1395,13 +1397,10 @@ Function ConvertOpen$ (args As String, lineNumber As Integer)
     ReDim parts(0) As String
     Dim As String filename, mode, handle
     argc = SLSplit(args, parts(), False)
-    If argc < 5 Then
-        AddWarning lineNumber, "Syntax Error in Open statement"
-        Exit Function
-    End If
 
-    If UCase$(parts(2)) <> "FOR" Then
-        AddWarning lineNumber, "Syntax Error in Open statement"
+    ' The original form: OPEN "I", [#]handle, file [, record length]
+    If argc < 5 OrElse UCase$(parts(2)) <> "FOR" Then
+        ConvertOpen = ConvertOpenOriginal(args, lineNumber)
         Exit Function
     End If
 
@@ -1410,11 +1409,41 @@ Function ConvertOpen$ (args As String, lineNumber As Integer)
         Exit Function
     End If
 
-    filename = parts(1)
+    filename = String.Trim(ConvertExpression(parts(1), lineNumber))
     mode = "QB." + UCase$(parts(3))
-    handle = String.Replace(parts(5), "#", "")
+    handle = String.Trim(ConvertExpression(String.Replace(parts(5), "#", ""), lineNumber))
 
     ConvertOpen = filename + ", " + mode + ", " + handle
+End Function
+
+' OPEN mode, [#]handle, file [, record length], where the mode is a string of I, O, A, R or B
+Function ConvertOpenOriginal$ (args As String, lineNumber As Integer)
+    Dim argc As Integer
+    ReDim parts(0) As String
+    Dim As String mode, umode
+    argc = ListSplit(args, parts())
+    umode = UCase$(String.Trim(parts(1)))
+    If argc < 3 Then
+        AddWarning lineNumber, "Syntax Error in Open statement"
+        Exit Function
+    End If
+
+    If umode = Chr$(34) + "I" + Chr$(34) Then
+        mode = "QB.INPUT"
+    ElseIf umode = Chr$(34) + "O" + Chr$(34) Then
+        mode = "QB.OUTPUT"
+    ElseIf umode = Chr$(34) + "A" + Chr$(34) Then
+        mode = "QB.APPEND"
+    ElseIf umode = Chr$(34) + "R" + Chr$(34) Then
+        mode = "QB.RANDOM"
+    ElseIf umode = Chr$(34) + "B" + Chr$(34) Then
+        mode = "QB.BINARY"
+    Else
+        AddWarning lineNumber, "Syntax Error in Open statement"
+        Exit Function
+    End If
+
+    ConvertOpenOriginal = String.Trim(ConvertExpression(parts(3), lineNumber)) + ", " + mode + ", " + String.Trim(ConvertExpression(String.Replace(parts(2), "#", ""), lineNumber))
 End Function
 
 Function ConvertLine$ (args As String, lineNumber As Integer)
@@ -1717,7 +1746,8 @@ Function ConvertPSet$ (args As String, lineNumber As Integer)
     firstParam = ConvertExpression(firstParam, lineNumber)
     If (String.Trim(firstParam) = "") Then firstParam = "undefined, undefined"
 
-    theRest = ConvertExpression(theRest, lineNumber)
+    ' An argument that is left out, as in CIRCLE (x, y), r, , , , aspect, becomes undefined
+    If String.Trim(theRest) <> "" Then theRest = ConvertMethodParams(theRest, lineNumber)
 
     ConvertPSet = sstep + ", " + firstParam + ", " + theRest
 End Function
@@ -1752,6 +1782,7 @@ Function ConvertPrint$ (m As Method, args As String, lineNumber As Integer)
 
     js = js + "["
     Dim As Integer i, usingMode
+    Dim item As String
     For i = startIdx To pcount
         If i > startIdx AndAlso Not usingMode Then js = js + ","
 
@@ -1786,7 +1817,15 @@ Function ConvertPrint$ (m As Method, args As String, lineNumber As Integer)
             End If
 
         Else
-            js = js + ConvertExpression(parts(i), lineNumber)
+            ' TAB(n) and SPC(n) are print items, not functions
+            item = String.Trim(parts(i))
+            If UCase$(Left$(item, 4)) = "TAB(" And Right$(item, 1) = ")" Then
+                js = js + "QB.tab(" + ConvertExpression(Mid$(item, 5, Len(item) - 5), lineNumber) + ")"
+            ElseIf UCase$(Left$(item, 4)) = "SPC(" And Right$(item, 1) = ")" Then
+                js = js + "QB.spc(" + ConvertExpression(Mid$(item, 5, Len(item) - 5), lineNumber) + ")"
+            Else
+                js = js + ConvertExpression(parts(i), lineNumber)
+            End If
         End If
     Next i
     If usingMode Then js = js + ")"
