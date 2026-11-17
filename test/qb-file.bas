@@ -140,4 +140,24 @@ RmDir "test"
 Sub OpenFail: Open "../data.txt" For Input As #1: Close #1: End Sub
 UT.AssertError(@OpenFail, "File not found")
 
+' INPUT # into an integer: QBJS cuts off the fraction; $ROUNDING EVEN rounds as QB does (3.5 to 4, 2.5 to 2)
+Dim inA%, inB%, inC&
+Open "test.txt" For Output As #1
+Print #1, "3.5,2.5,6.5"
+Close #1
+Open "test.txt" For Input As #1
+Input #1, inA%, inB%, inC&
+Close #1
+UT.AssertEquals inA%, 3
+UT.AssertEquals inB%, 2
+UT.AssertEquals inC&, 6
+$ROUNDING EVEN
+Open "test.txt" For Input As #1
+Input #1, inA%, inB%, inC&
+Close #1
+$ROUNDING UP
+UT.AssertEquals inA%, 4
+UT.AssertEquals inB%, 2
+UT.AssertEquals inC&, 6
+
 Console.Echo "QB File I/O - tests completed with no errors* in " + (Sys.TimeInMillis - ts) + " millisecond(s)"

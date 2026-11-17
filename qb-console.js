@@ -294,6 +294,11 @@ function _QB() {
         }
     }
 
+    // integer assignment and integer parameters: the compiler's own code only needs QBJS's default rounding
+    function roundInt(value) {
+        return Math.round(value);
+    }
+
     function func_Rnd(n) {
         if (n == undefined) {n = 1;}
         if (n != 0) {
@@ -374,6 +379,7 @@ function _QB() {
         func_Mid: func_Mid,
         func_Right: func_Right,
         func__Round: func__Round,
+        roundInt: roundInt,
         func_Rnd: func_Rnd,
         func_RTrim: func_RTrim,
         func_Str: func_Str,

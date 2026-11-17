@@ -71,6 +71,38 @@ UT.AssertEquals Peek(100), 7
 Def Seg
 UT.AssertEquals Peek(100), 65
 
+' Rounding into an integer: QBJS rounds a half up (2.5 to 3); $ROUNDING EVEN rounds it to the even
+' number as QB does (2.5 to 2, 3.5 to 4, -2.5 to -2, -3.5 to -4). CINT is always QB's.
+Dim rndA%, rndB&
+rndA% = 2.5
+UT.AssertEquals rndA%, 3
+rndA% = 3.5
+UT.AssertEquals rndA%, 4
+UT.AssertEquals rndHalf(2.5), 3
+UT.AssertEquals CInt(2.5), 2
+$ROUNDING EVEN
+rndA% = 2.5
+UT.AssertEquals rndA%, 2
+rndA% = 3.5
+UT.AssertEquals rndA%, 4
+rndA% = -2.5
+UT.AssertEquals rndA%, -2
+rndA% = -3.5
+UT.AssertEquals rndA%, -4
+rndA% = 0.5
+UT.AssertEquals rndA%, 0
+rndA% = 2.6
+UT.AssertEquals rndA%, 3
+rndB& = 6.5
+UT.AssertEquals rndB&, 6
+UT.AssertEquals rndHalf(2.5), 2
+UT.AssertEquals rndHalf(3.5), 4
+UT.AssertEquals rndHalf(1.4), 1
+$ROUNDING UP
+UT.AssertEquals rndHalf(2.5), 3
+rndA% = 2.5
+UT.AssertEquals rndA%, 3
+
 ' DEFINT, DEFLNG, DEFSNG, DEFDBL, DEFSTR and _DEFINE give a name without a suffix its type, from the
 ' letters given, for the lines that follow (and for the procedures that follow)
 dtx = 2.7
@@ -103,6 +135,10 @@ UT.AssertEquals bAddOne(1.4), 1
 UT.AssertEquals dtTwice(2.6), 5.2
 
 Console.Echo "QB Language - tests completed with no errors* in " + (Sys.TimeInMillis - ts) + " millisecond(s)"
+
+Function rndHalf (n As Integer)
+    rndHalf = n
+End Function
 
 Function bAddOne (aval)
     bAddOne = aval + 0.4

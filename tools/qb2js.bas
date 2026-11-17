@@ -121,6 +121,7 @@ Dim Shared As Integer staticVarLine
 Dim Shared As Integer implicitVarLine
 Dim Shared As String condWords(4)
 Dim Shared As Integer forceSelfConvert
+Dim Shared As Integer optionRoundHalfEven
 Dim Shared As Integer optionExplicit
 Dim Shared As Integer optionExplicitArray
 ' DEFINT and the other DEF statements. Entry i covers the letters defFirst(i) to defLast(i) (1 to 26)
@@ -249,6 +250,7 @@ Sub Compile (source As String, moduleName As String, selfConvert)
     AddJSLine 0, "async function main() {"
 
     If Not selfConvert And moduleName = "" Then AddJSLine 0, "QB.start();"
+    If Not selfConvert And moduleName = "" And optionRoundHalfEven Then AddJSLine 0, "QB.setRoundHalfEven(true);"
 
     If Not selfConvert And moduleName = "" Then
         Dim mtest As Method
@@ -359,6 +361,7 @@ Sub Compile (source As String, moduleName As String, selfConvert)
         AddJSLine 0, "   return QB.arrayValue(modules, [id]).value;"
         AddJSLine 0, "}"
         AddJSLine 0, "function setSelfConvert() { sub_SetSelfConvert(); }"
+        AddJSLine 0, "function setRoundHalfEven() { sub_SetRoundHalfEven(); }"
         AddJSLine 0, ""
         AddJSLine 0, "return {"
         AddJSLine 0, "   compile: compile,"
@@ -369,6 +372,7 @@ Sub Compile (source As String, moduleName As String, selfConvert)
         AddJSLine 0, "   getSourceLine: getSourceLine,"
         AddJSLine 0, "   getModule: getModule,"
         AddJSLine 0, "   setSelfConvert: setSelfConvert,"
+        AddJSLine 0, "   setRoundHalfEven: setRoundHalfEven,"
         AddJSLine 0, "};"
         AddJSLine 0, "}"
         AddJSLine 0, "if (typeof module != 'undefined') { module.exports.QBCompiler = _QBCompiler; }"
@@ -380,6 +384,13 @@ End Sub
 
 Sub SetSelfConvert ()
     forceSelfConvert = True
+End Sub
+
+' The compiler option for rounding to the even number (QB's way) when a value is assigned to an
+' integer, passed to a procedure's integer parameter or read by INPUT. The $ROUNDING EVEN metacommand
+' does the same from inside a program.
+Sub SetRoundHalfEven ()
+    optionRoundHalfEven = True
 End Sub
 
 Sub InitTypes
@@ -790,6 +801,20 @@ Sub ConvertLines (firstLine As Integer, lastLine As Integer, functionName As Str
             ElseIf first = "$NOPREFIX" Then
                 ' nothing to do here, keywords prefixes are optional
 
+            ElseIf first = "$ROUNDING" Then
+                ' $ROUNDING EVEN rounds to the even number, as QB does; $ROUNDING UP (the default) rounds
+                ' a half up. QB64pe does not know it, so a program that also builds there puts it inside
+                ' $IF WEB THEN ... $END IF.
+                second = ""
+                If UBound(parts) > 1 Then second = UCase$(String.Trim(parts(2)))
+                If second = "EVEN" Then
+                    js = "QB.setRoundHalfEven(true);"
+                ElseIf second = "UP" Then
+                    js = "QB.setRoundHalfEven(false);"
+                Else
+                    AddWarning i, "Expected $ROUNDING EVEN or $ROUNDING UP"
+                End If
+
             ElseIf first = "$IF" Then
                 If UBound(parts) > 1 Then
                     If UCase$(parts(2)) = "JAVASCRIPT" Then
@@ -977,7 +1002,7 @@ Sub ConvertLines (firstLine As Integer, lastLine As Integer, functionName As Str
                     rightSide = String.Trim(Join(parts(), assignment + 1, -1, " "))
                     leftConverted = ConvertExpression(leftSide, i)
                     rightConverted = ConvertExpression(rightSide, i)
-                    If IsIntegerVar(leftSide) Then rightConverted = "Math.round( " + rightConverted + " )"
+                    If IsIntegerVar(leftSide) Then rightConverted = "QB.roundInt( " + rightConverted + " )"
                     js = RemoveSuffix(leftConverted) + " = " + rightConverted + ";"
                 Else
                     ' Check to see if there was no space left between the sub name and initial paren
@@ -3053,7 +3078,7 @@ Sub ConvertMethods ()
                             ' lookup the variable to get the jsname
                             Dim varIsArray As Integer
                             If FindVariable(bvar.name, bvar, varIsArray) Then
-                                intConv = intConv + bvar.jsname + " = Math.round(" + bvar.jsname + "); "
+                                intConv = intConv + bvar.jsname + " = QB.roundInt(" + bvar.jsname + "); "
                             End If
 
                         ElseIf typeName = "FUNCTION" Or typeName = "SUB" Then

@@ -330,11 +330,33 @@ var QB = new function() {
 
     // Data type conversions
     this.toInteger = function(value) {
+        if (_roundHalfEven) {
+            // like QB, INPUT into an integer rounds the number it reads
+            var n = parseFloat(value);
+            return isNaN(n) ? 0 : QB.roundInt(n);
+        }
         var result = parseInt(value);
         if (isNaN(result)) {
             result = 0;
         }
         return result;
+    };
+
+    // The rounding used when a value is assigned to an integer variable or passed to an integer
+    // parameter. QBJS rounds a half up (2.5 to 3); QB rounds it to the even number (2.5 to 2, 3.5 to 4).
+    // setRoundHalfEven(true) chooses QB's way; it is off by default.
+    var _roundHalfEven = false;
+
+    this.setRoundHalfEven = function(on) {
+        _roundHalfEven = !!on;
+    };
+
+    this.roundInt = function(value) {
+        var r = Math.round(value);
+        if (_roundHalfEven && Math.abs(value % 1) === 0.5 && r % 2 !== 0) {
+            r -= 1;
+        }
+        return r;
     };
 
     this.toFloat = function(value) {
