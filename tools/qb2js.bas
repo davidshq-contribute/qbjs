@@ -1321,6 +1321,9 @@ Function ConvertSub$ (m As Method, args As String, lineNumber As Integer)
     ElseIf m.name = "Window" Then
         js = CallMethod(m) + "(" + ConvertWindow(args, lineNumber) + ");"
 
+    ElseIf m.name = "View" Then
+        js = CallMethod(m) + "(" + ConvertView(args, lineNumber) + ");"
+
     ElseIf m.name = "Write" Then
         js = ConvertWrite(m, args, lineNumber)
 
@@ -1559,6 +1562,38 @@ Function ConvertWindow$ (args As String, lineNumber As Integer)
     endCord = ConvertExpression(endCord, lineNumber)
 
     ConvertWindow = invertFlag + ", " + startCord + ", " + endCord
+End Function
+
+Function ConvertView$ (args As String, lineNumber As Integer)
+    Dim argc As Integer
+    ReDim parts(0) As String
+    Dim As String coord, fillColor, borderColor, screenFlag
+    fillColor = "undefined"
+    borderColor = "undefined"
+    screenFlag = "false"
+
+    args = String.Trim(args)
+    If UCase$(Left$(args, 6)) = "SCREEN" Then
+        If Len(args) = 6 Or Mid$(args, 7, 1) = " " Or Mid$(args, 7, 1) = "(" Then
+            screenFlag = "true"
+            args = String.Trim(Right$(args, Len(args) - 6))
+        End If
+    End If
+
+    argc = ListSplit(args, parts())
+    If argc >= 1 Then
+        coord = ConvertCoordParam(parts(1), True, lineNumber)
+    Else
+        coord = ConvertCoordParam("", True, lineNumber)
+    End If
+    If argc >= 2 Then
+        If String.Trim(parts(2)) <> "" Then fillColor = ConvertExpression(parts(2), lineNumber)
+    End If
+    If argc >= 3 Then
+        If String.Trim(parts(3)) <> "" Then borderColor = ConvertExpression(parts(3), lineNumber)
+    End If
+
+    ConvertView = coord + ", " + fillColor + ", " + borderColor + ", " + screenFlag
 End Function
 
 Function ConvertCls$ (args As String, lineNumber As Integer)
@@ -4987,6 +5022,7 @@ Sub InitQBMethods
     AddQBMethod "FUNCTION", "UCase$", False
     AddQBMethod "FUNCTION", "Val", False
     AddQBMethod "FUNCTION", "Varptr", False
+    AddQBMethod "SUB", "View", False
     AddQBMethod "SUB", "Window", False
     AddQBMethod "SUB", "Write", True
 

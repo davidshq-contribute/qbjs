@@ -2139,6 +2139,8 @@ var ConvertSub = null;
       js = (await func_ConvertSwap(  m,    args,    lineNumber));
    } else if ( m.name ==  "Window" ) {
       js = (await func_CallMethod(  m))  + "("  + (await func_ConvertWindow(  args,    lineNumber))  + ");";
+   } else if ( m.name ==  "View" ) {
+      js = (await func_CallMethod(  m))  + "("  + (await func_ConvertView(  args,    lineNumber))  + ");";
    } else if ( m.name ==  "Write" ) {
       js = (await func_ConvertWrite(  m,    args,    lineNumber));
    } else if ( m.name ==  "_PrintString"  |  m.name ==  "PrintString" ) {
@@ -2392,6 +2394,42 @@ var ConvertWindow = null;
    endCord = (await func_ConvertExpression(  endCord,    lineNumber));
    ConvertWindow =  invertFlag + ", "  +  startCord + ", "  +  endCord;
 return ConvertWindow;
+}
+async function func_ConvertView(args/*STRING*/,lineNumber/*INTEGER*/) {
+if (QB.halted()) { return; }; lineNumber = Math.round(lineNumber); 
+var ConvertView = null;
+/* implicit variables: */ 
+   var argc = 0;  /* INTEGER */ 
+   var parts = QB.initArray([{l:0,u: 0}], '');  /* STRING */ 
+   var coord = '';  /* STRING */ var fillColor = '';  /* STRING */ var borderColor = '';  /* STRING */ var screenFlag = '';  /* STRING */ 
+   fillColor = "undefined";
+   borderColor = "undefined";
+   screenFlag = "false";
+   args = (await String.func_Trim(  args));
+   if ((QB.func_UCase( (QB.func_Left(  args,    6))))  ==  "SCREEN" ) {
+      if ((QB.func_Len(  args))  ==   6 | (QB.func_Mid(  args,    7,    1))  ==  " "  | (QB.func_Mid(  args,    7,    1))  ==  "(" ) {
+         screenFlag = "true";
+         args = (await String.func_Trim( (QB.func_Right(  args,   (QB.func_Len(  args))  -  6))));
+      }
+   }
+   argc = Math.round( (await func_ListSplit(  args,   parts)) );
+   if ( argc >=  1) {
+      coord = (await func_ConvertCoordParam( QB.arrayValue(parts, [ 1]).value ,    True,    lineNumber));
+   } else {
+      coord = (await func_ConvertCoordParam( "" ,    True,    lineNumber));
+   }
+   if ( argc >=  2) {
+      if ((await String.func_Trim( QB.arrayValue(parts, [ 2]).value))  !=  "" ) {
+         fillColor = (await func_ConvertExpression( QB.arrayValue(parts, [ 2]).value ,    lineNumber));
+      }
+   }
+   if ( argc >=  3) {
+      if ((await String.func_Trim( QB.arrayValue(parts, [ 3]).value))  !=  "" ) {
+         borderColor = (await func_ConvertExpression( QB.arrayValue(parts, [ 3]).value ,    lineNumber));
+      }
+   }
+   ConvertView =  coord + ", "  +  fillColor + ", "  +  borderColor + ", "  +  screenFlag;
+return ConvertView;
 }
 async function func_ConvertCls(args/*STRING*/,lineNumber/*INTEGER*/) {
 if (QB.halted()) { return; }; lineNumber = Math.round(lineNumber); 
@@ -5776,6 +5814,7 @@ if (QB.halted()) { return; };
    await sub_AddQBMethod( "FUNCTION" ,   "UCase$" ,    False);
    await sub_AddQBMethod( "FUNCTION" ,   "Val" ,    False);
    await sub_AddQBMethod( "FUNCTION" ,   "Varptr" ,    False);
+   await sub_AddQBMethod( "SUB" ,   "View" ,    False);
    await sub_AddQBMethod( "SUB" ,   "Window" ,    False);
    await sub_AddQBMethod( "SUB" ,   "Write" ,    True);
    await sub_AddQBMethod( "SUB" ,   "IncludeJS" ,    True);

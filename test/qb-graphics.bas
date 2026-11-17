@@ -11,4 +11,34 @@ Circle (100, 100), 50, c
 UT.AssertEquals _Alpha(c), 100
 UT.AssertEquals _Alpha32(c), 100
 
+' VIEW sets a graphics view port; CLS 1 and CLS clear only that; VIEW alone ends it
+Screen 12
+Dim red As Unsigned Long
+Line (0, 0)-(639, 479), 4, BF
+red = Point(0, 0)
+View (100, 100)-(300, 200)
+Cls 1
+View
+UT.AssertEquals Point(200, 150), _RGB32(0, 0, 0)
+UT.AssertEquals Point(99, 150), red
+UT.AssertEquals Point(301, 150), red
+UT.AssertEquals Point(200, 99), red
+UT.AssertEquals Point(200, 201), red
+View (10, 300)-(50, 340)
+Cls
+View
+UT.AssertEquals Point(30, 320), _RGB32(0, 0, 0)
+UT.AssertEquals Point(9, 320), red
+Dim green As Unsigned Long, white As Unsigned Long
+Line (600, 0)-(605, 5), 2, BF
+Line (600, 10)-(605, 15), 15, BF
+green = Point(602, 2)
+white = Point(602, 12)
+View (400, 300)-(450, 340), 2, 15
+View
+UT.AssertEquals Point(420, 320), green
+UT.AssertEquals Point(399, 320), white
+Cls
+UT.AssertEquals Point(200, 150), _RGB32(0, 0, 0)
+
 Console.Echo "QB Graphics - tests completed with no errors* in " + (Sys.TimeInMillis - ts) + " millisecond(s)"

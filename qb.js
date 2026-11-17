@@ -249,6 +249,8 @@ var QB = new function() {
     var _strokeLineThickness = 2;
     var _windowAspect = [];
     var _windowDef = [];
+    var _viewport = undefined;
+    var _viewportWarned = false;
     var _fileHandles = {};
     var _typeMap = {};
     var _ucharMap = {};
@@ -1668,15 +1670,24 @@ var QB = new function() {
     };
 
     this.sub_Cls = function(method, bgColor) {
-        // method parameter is ignored, there is no separate view port for text and graphics
+        // there is no separate view port for text, so only the graphics view port (VIEW) is used:
+        // CLS 1, or CLS alone, clears just that view port; CLS 0 and CLS 2 clear the whole screen
 
         var color = _bgColor;
         if (bgColor != undefined) {
             color = _color(bgColor);
         }
-        
+
         ctx = _images[_activeImage].ctx;
         _flushScreenCache(_images[_activeImage]);
+        if (_viewport != undefined && (method == undefined || method == 1)) {
+            var vx = _viewport.x1, vy = _viewport.y1;
+            var vw = _viewport.x2 - _viewport.x1 + 1, vh = _viewport.y2 - _viewport.y1 + 1;
+            ctx.clearRect(vx, vy, vw, vh);
+            ctx.fillStyle = color.rgba();
+            ctx.fillRect(vx, vy, vw, vh);
+            return;
+        }
         ctx.clearRect(0, 0, _width(), _height());
         ctx.fillStyle = color.rgba();
         ctx.fillRect(0, 0, _width(), _height());
@@ -2404,6 +2415,7 @@ var QB = new function() {
     };
 
     this.sub_Circle = function(step, x, y, radius, color, startAngle, endAngle, aspect) {
+        _warnViewport("CIRCLE");
 
         var screen = _images[_activeImage];
         var ctx = screen.ctx;
@@ -2478,6 +2490,7 @@ var QB = new function() {
     };
 
     this.sub_Line = function(sstep, sx, sy, estep, ex, ey, color, style, pattern) {
+        _warnViewport("LINE");
         var screen = _images[_activeImage];
         _flushScreenCache(_images[_activeImage]);
 
@@ -2850,6 +2863,7 @@ var QB = new function() {
     }
 
     this.sub_Paint = function(sstep, startX, startY, fillColor, borderColor) {
+        _warnViewport("PAINT");
         // See: http://www.williammalone.com/articles/html5-canvas-javascript-paint-bucket-tool/
         // TODO: this method should probably utilize the same screen cache as PSet
         _flushScreenCache(_images[_activeImage]);
@@ -2978,6 +2992,7 @@ var QB = new function() {
     };
 
     this.sub_PReset = function(sstep, x, y, color) {
+        _warnViewport("PRESET");
         var screen = _images[_activeImage];
         if (color == undefined) {
             color = _bgColor;
@@ -3385,6 +3400,7 @@ var QB = new function() {
     }
 
     this.sub_PSet = function(sstep, x, y, color) {
+        _warnViewport("PSET");
         var screen = _images[_activeImage];
         
         x = Math.round(x);
@@ -4148,6 +4164,37 @@ var QB = new function() {
     this.func_Varptr = function(value) {
         return String(value);
     };
+
+    // VIEW sets the graphics view port, VIEW alone ends it. Only CLS uses the view port so far:
+    // drawing statements do not move to its corner or clip to it (see _warnViewport).
+    this.sub_View = function(sstep, sx, sy, estep, ex, ey, fillColor, borderColor, screenSwitch) {
+        var screen = _images[_activeImage];
+        if (sx == undefined || sy == undefined || ex == undefined || ey == undefined) {
+            _viewport = undefined;
+            return;
+        }
+        var x1 = Math.min(sx, ex), x2 = Math.max(sx, ex);
+        var y1 = Math.min(sy, ey), y2 = Math.max(sy, ey);
+        _viewport = { x1: x1, y1: y1, x2: x2, y2: y2 };
+        _flushScreenCache(screen);
+        var ctx = screen.ctx;
+        if (fillColor != undefined) {
+            ctx.fillStyle = _color(fillColor).rgba();
+            ctx.fillRect(x1, y1, x2 - x1 + 1, y2 - y1 + 1);
+        }
+        if (borderColor != undefined) {
+            ctx.strokeStyle = _color(borderColor).rgba();
+            ctx.lineWidth = 1;
+            ctx.strokeRect(x1 - 0.5, y1 - 0.5, x2 - x1 + 2, y2 - y1 + 2);
+        }
+    };
+
+    function _warnViewport(statement) {
+        if (_viewport != undefined && !_viewportWarned) {
+            _viewportWarned = true;
+            console.warn(statement + " was used while a VIEW is set; it is not moved to or clipped to the view port.");
+        }
+    }
 
     this.sub_Window = function(screenSwitch, x0, y0, x1, y1) {
         var screen = _images[_activeImage];
