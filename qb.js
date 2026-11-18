@@ -210,6 +210,7 @@ var QB = new function() {
     var _bgColor = null; 
     var _colormap = [];
     var _currScreenImage = null;
+    var _screenMode = undefined;
     var _dataBulk = [];
     var _dataLabelMap;
     var _font = 16;
@@ -484,6 +485,7 @@ var QB = new function() {
         _initColorTable();
         GX._enableTouchMouse(true);
         GX.registerGameEvents(function(e){});
+        _screenMode = undefined;
         QB.sub_Screen(0);
     };
 
@@ -4184,6 +4186,9 @@ var QB = new function() {
     };
 
     this.sub_Screen = function(mode) {
+        // SCREEN with the mode already in use changes nothing, as in QB64: the pixels, cursors,
+        // colors, view port and WINDOW stay
+        if (mode < 1000 && mode == _screenMode) { return; }
         _activeImage = 0;
         // a new screen has no view port, as in QB64
         _viewport = undefined;
@@ -4233,6 +4238,7 @@ var QB = new function() {
         _images[0].lastY = _images[0].canvas.height/2;
         _images[0].canvas.style.cursor = "default";
         _images[0].mode = screenMode;
+        _screenMode = (mode < 1000) ? mode : undefined;
 
         _screenDiagInv = 1/Math.sqrt(_images[0].canvas.width*_images[0].canvas.width + _images[0].canvas.height*_images[0].canvas.height);
         
@@ -5505,6 +5511,7 @@ var QB = new function() {
 
         addEventListener("gxscenecreate", function(event) {
             _images[0].mode = 32;
+            _screenMode = undefined;
         });
 
         addEventListener("keydown", function(event) {
