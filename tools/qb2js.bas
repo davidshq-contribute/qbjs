@@ -414,7 +414,7 @@ Sub SetRoundHalfEven ()
 End Sub
 
 ' The compiler option for lines of whole pixels, one wide, as QB draws them, instead of QBJS's smoothed
-' canvas strokes. So far DRAW follows it. The $LINES QB metacommand does the same from inside a program.
+' canvas strokes. DRAW and LINE follow it. The $LINES QB metacommand does the same from inside a program.
 Sub SetQBLines ()
     optionQBLines = True
 End Sub
