@@ -38,11 +38,13 @@ var QB = new function() {
                 g.gain.value = 0.25;
                 o.frequency.value = frequency;
                 o.type = this.type;
-                o.start();
                 const actualDuration = duration * this.mode;
                 const pause = duration - actualDuration;
+                // the note ends on the audio clock, so a busy page cannot make it longer
+                const t = this._audioContext.currentTime;
+                o.start(t);
+                o.stop(t + actualDuration / 1000);
                 await delay(actualDuration);
-                o.stop();
                 if (pause) { await delay(pause); }
             }
         }
@@ -1575,10 +1577,10 @@ var QB = new function() {
         oscillator.type = "square";
         oscillator.frequency.value = 780;
         oscillator.connect(_soundCtx.destination);
-        oscillator.start(); 
-        setTimeout(function () {
-            oscillator.stop();
-        }, 200);  
+        // the beep ends on the audio clock, so a busy page cannot make it longer
+        var t = _soundCtx.currentTime;
+        oscillator.start(t);
+        oscillator.stop(t + 0.2);
     };
 
     this.sub_ChDir = function(path) {
@@ -3956,11 +3958,13 @@ var QB = new function() {
             oscillator.connect(gainNode);
             gainNode.connect(_soundCtx.destination)
             gainNode.gain.value = gain;
-            oscillator.start(); 
-            setTimeout(await async function () {
-                gainNode.gain.setTargetAtTime(0, _soundCtx.currentTime, decay);
-                oscillator.stop(duration + decay + 1);
-            }, duration);  
+            // The tone ends on the audio clock, so a busy page cannot make it longer. The times are in
+            // seconds: duration is in milliseconds.
+            var t = _soundCtx.currentTime;
+            var seconds = duration / 1000;
+            oscillator.start(t);
+            gainNode.gain.setTargetAtTime(0, t + seconds, decay);
+            oscillator.stop(t + seconds + decay + 1);
             await GX.sleep(duration*2/3);
         }
     };
