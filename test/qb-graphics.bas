@@ -227,4 +227,44 @@ Draw "C15R10"
 UT.AssertTrue Point(25, 29) <> black
 $Lines Smooth
 
+' A new line on either of the last two rows moves the rows above the last one up, and leaves the
+' cursor on the row before the last. The last row does not move. QB64pe gives the same results.
+Screen 12
+Color 15, 0
+Cls 0
+Locate 5, 1: Print "m";
+Locate 30, 3: Print "z";
+Locate 28, 1: Print "a"
+UT.AssertEquals Csrlin, 29
+UT.AssertEquals RowText(5), 1
+Print "b"
+UT.AssertEquals Csrlin, 29
+UT.AssertEquals Pos(0), 1
+UT.AssertEquals RowText(4), 1
+UT.AssertEquals RowText(5), 0
+UT.AssertEquals RowText(27), 1
+UT.AssertEquals RowText(28), 1
+UT.AssertEquals RowText(29), 0
+UT.AssertEquals RowText(30), 1
+Locate 30, 1: Print "c"
+UT.AssertEquals Csrlin, 29
+UT.AssertEquals RowText(3), 1
+UT.AssertEquals RowText(4), 0
+UT.AssertEquals RowText(26), 1
+UT.AssertEquals RowText(27), 1
+UT.AssertEquals RowText(28), 0
+UT.AssertEquals RowText(30), 1
+Cls 0
+
 Console.Echo "QB Graphics - tests completed with no errors* in " + (Sys.TimeInMillis - ts) + " millisecond(s)"
+
+' 1 when the text row of SCREEN 12 holds a pixel that is not the background, in its first 5 columns
+Function RowText (row As Integer)
+    Dim x As Integer, y As Integer
+    RowText = 0
+    For y = (row - 1) * 16 To row * 16 - 1
+        For x = 0 To 39
+            If Point(x, y) <> Point(639, 479) Then RowText = 1
+        Next x
+    Next y
+End Function
