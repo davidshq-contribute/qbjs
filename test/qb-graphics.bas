@@ -268,6 +268,21 @@ UT.AssertEquals Point(110, 105), fill
 UT.AssertEquals Point(121, 105), black
 UT.AssertEquals Point(110, 111), black
 
+
+' PAINT spreads over pixels of the fill color too, so painting an area again covers what was drawn on
+' it since. QB64pe gives the same results.
+Cls 0
+Line (10, 10)-(200, 200), 10, B
+Paint (100, 100), 2, 10
+Line (50, 50)-(80, 80), 4, B
+Line (120, 120)-(150, 150), 0, BF
+PSet (20, 20), 14
+Paint (100, 100), 2, 10
+UT.AssertEquals Point(50, 50), green
+UT.AssertEquals Point(65, 65), green
+UT.AssertEquals Point(130, 130), green
+UT.AssertEquals Point(20, 20), green
+UT.AssertEquals Point(5, 5), black
 ' a program that sets a line width (LineWidth of the Graphics 2D library) keeps the canvas strokes
 $If Javascript Then
     QB.defaultLineWidth(2);
