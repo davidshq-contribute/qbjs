@@ -3098,6 +3098,16 @@ var QB = new function() {
             borderColor = _color(borderColor);
         }
 
+        // A pixel the fill may spread to. QBJS stops at the fill color as well as the border. With
+        // setQBLines(true) the fill spreads, as in QB64, over every pixel not of the border color, also
+        // those that have the fill color already, so a PAINT over an area painted before covers what
+        // was drawn on it since.
+        var done = (_qbLines && !_lineWidthSet) ? new Uint8Array(screen.canvas.width * screen.canvas.height) : null;
+        var open = function(p) {
+            if (done) { return !done[p / 4] && checkPixel(data, p, borderColor, borderColor); }
+            return checkPixel(data, p, fillColor, borderColor);
+        };
+
         var pixelStack = [[Math.floor(x0), Math.floor(y0)]];
 
         while (pixelStack.length) {
@@ -3107,7 +3117,7 @@ var QB = new function() {
             y = newPos[1];
             pixelIndex = (y * screen.canvas.width + x) * 4;
 
-            while ((y-- >= minY) && checkPixel(data, pixelIndex, fillColor, borderColor)) {
+            while ((y-- >= minY) && open(pixelIndex)) {
                 pixelIndex -= screen.canvas.width * 4;
             }
             pixelIndex += screen.canvas.width * 4;
@@ -3115,15 +3125,16 @@ var QB = new function() {
 
             flagLeft = false;
             flagRight = false;
-            while ((y++ < maxY) && checkPixel(data, pixelIndex, fillColor, borderColor)) {
+            while ((y++ < maxY) && open(pixelIndex)) {
                 ctx.fillStyle = fillColor.rgba();
                 ctx.fillRect(x, y, 1, 1);
                 data[pixelIndex] = fillColor.r;
                 data[pixelIndex+1] = fillColor.g;
                 data[pixelIndex+2] = fillColor.b;
                 data[pixelIndex+3] = fillColor.a;
+                if (done) { done[pixelIndex / 4] = 1; }
                 if (x > minX) {
-                    if (checkPixel(data, pixelIndex - 4, fillColor, borderColor)) {
+                    if (open(pixelIndex - 4)) {
                         if (!flagLeft) {
                             pixelStack.push([x - 1, y]);
                             flagLeft = true;
@@ -3133,7 +3144,7 @@ var QB = new function() {
                     }
                 }
                 if (x < maxX) {
-                    if (checkPixel(data, pixelIndex + 4, fillColor, borderColor)) {
+                    if (open(pixelIndex + 4)) {
                         if (!flagRight) {
                             pixelStack.push([x + 1, y]);
                             flagRight = true;
