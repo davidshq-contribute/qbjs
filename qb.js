@@ -2689,6 +2689,13 @@ var QB = new function() {
         screen.lastX = x;
         screen.lastY = y;
 
+        if (_qbLines && !_lineWidthSet) {
+            var origin = _viewOrigin();
+            _pixelCircle(screen, x + origin.x, y + origin.y, radius, color, startAngle, endAngle, aspect);
+            _strokeDrawColor = _color(color);
+            return;
+        }
+
         ctx.lineWidth = _strokeLineThickness;
         ctx.lineWidth += Math.tanh(8*radius*_screenDiagInv); // Adds some radius to compensate for antialiasing. The prefactor 8 is arbitrary. //
         ctx.strokeStyle = color.rgba();
@@ -3807,6 +3814,87 @@ var QB = new function() {
         screen.imgdata.data[pixelIndex + 2] = color.b;
         screen.imgdata.data[pixelIndex + 3] = color.a * 255;
     };
+
+    // Sets the pixels of a circle, an ellipse or an arc, whole screen pixels, as QB64's sub_circle does.
+    // The center is rounded half away from zero. A point is stepped around a quarter of the circle, one
+    // step per pixel of the quarter's length, and set in the four quarters each time it has moved two
+    // pixels or more from the last one set. An angle below zero draws a line from the center to that end
+    // of the arc. When the end angle is below the start, the rest of the circle is drawn. With no aspect
+    // given, the aspect of the screen mode is used, as in QB64.
+    function _pixelCircle(screen, x, y, r, color, start, end, aspect) {
+        var pi = 3.1415926535897932, pi2 = 6.2831853071795865;
+        var trunc = Math.trunc;
+        if (!screen.cached) {
+            screen.imgdata = screen.ctx.getImageData(0, 0, screen.canvas.width, screen.canvas.height);
+            screen.cached = true;
+        }
+        var lineToStart = false, lineFromEnd = false, exclusive = false;
+        if (start < 0) { lineToStart = true; start = -start; }
+        if (end < 0) { lineFromEnd = true; end = -end; }
+        if (end < start) {
+            var t = start; start = end; end = t;
+            t = lineToStart; lineToStart = lineFromEnd; lineFromEnd = t;
+            exclusive = true;
+        }
+        var ix = trunc(x < 0 ? x - 0.5 : x + 0.5);
+        var iy = trunc(y < 0 ? y - 0.5 : y + 0.5);
+        r = Math.abs(r);
+        var xspan = r, yspan = r;
+        if (aspect == undefined) {
+            var mode = screen.mode;
+            aspect = 1;
+            if (mode == 1 || mode == 7 || mode == 13) { aspect = 4.0 * (200.0 / 320.0) / 3.0; }
+            if (mode == 2 || mode == 8) { aspect = 4.0 * (200.0 / 640.0) / 3.0; }
+            if (mode == 9 || mode == 10) { aspect = 4.0 * (350.0 / 640.0) / 3.0; }
+            if (mode == 11 || mode == 12) { aspect = 4.0 * (480.0 / 640.0) / 3.0; }
+        }
+        if (aspect >= 0) {
+            if (aspect < 1) { yspan *= aspect; }
+            if (aspect > 1) { xspan /= aspect; }
+        } else if (aspect > -1) {
+            yspan *= (1 + aspect);
+        }
+        if (lineToStart) {
+            _pixelLine(screen, ix, iy, ix + trunc(Math.cos(start) * xspan + 0.5), iy - trunc(Math.sin(start) * yspan - 0.5), color);
+        }
+        var pixels = trunc(pi2 * r / 4.0 + 0.5);
+        var arc1 = 0, arc2 = pi, arc3 = pi, arc4 = pi2;
+        var arcinc = (pi / 2) / pixels;
+        var sinb = Math.sin(arcinc), cosb = Math.cos(arcinc);
+        var px = 1, py = 0;
+        var lastPlottedX = -1, lastPlottedY = 0, lastX = 0, lastY = 0;
+        var i = 0;
+        while (true) {
+            var x2 = trunc(px * xspan + 0.5);
+            var y2 = trunc(py * yspan - 0.5);
+            if (i == 0) { lastX = x2; lastY = y2; }
+            if (i == 0 || i > pixels || Math.abs(x2 - lastPlottedX) >= 2 || Math.abs(y2 - lastPlottedY) >= 2) {
+                var arcs = [arc1, arc2, arc3, arc4];
+                var points = [[ix + lastX, iy + lastY], [ix - lastX, iy + lastY], [ix - lastX, iy - lastY], [ix + lastX, iy - lastY]];
+                for (var k = 0; k < 4; k++) {
+                    var inArc = exclusive ? (arcs[k] <= start || arcs[k] >= end) : (arcs[k] >= start && arcs[k] <= end);
+                    if (inArc) { _setPixel(screen, points[k][0], points[k][1], color); }
+                }
+                if (i > pixels) { break; }
+                lastPlottedX = lastX;
+                lastPlottedY = lastY;
+            }
+            lastX = x2;
+            lastY = y2;
+            i++;
+            if (i > pixels) { continue; }
+            var px2 = px * cosb + py * sinb;
+            py = py * cosb - px * sinb;
+            px = px2;
+            arc1 += arcinc;
+            arc2 -= arcinc;
+            arc3 += arcinc;
+            arc4 -= arcinc;
+        }
+        if (lineFromEnd) {
+            _pixelLine(screen, ix, iy, ix + trunc(Math.cos(end) * xspan + 0.5), iy - trunc(Math.sin(end) * yspan - 0.5), color);
+        }
+    }
 
     // Sets the pixels of a line from (x1, y1) to (x2, y2), whole screen pixels, as QB64 draws its lines:
     // it steps along the longer axis and rounds the other, kept as a single, half away from zero. Pixels
