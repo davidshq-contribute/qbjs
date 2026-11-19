@@ -2792,8 +2792,14 @@ var QB = new function() {
             x0 = screen.lastX + x0;
             y0 = screen.lastY + y0;
         }
-        
-        fillColor = _color(fillColor);
+
+        // as in QB, PAINT with no fill color fills with the current foreground color
+        if (fillColor == undefined) {
+            fillColor = _fgColor;
+        }
+        else {
+            fillColor = _color(fillColor);
+        }
         if (borderColor == undefined) {
             borderColor = fillColor;
         }

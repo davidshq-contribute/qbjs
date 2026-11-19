@@ -8,3 +8,4 @@ qbjs.zip
 .vscode/settings.json
 .vscode/tasks.json
 .DS_Store
+node_modules/
