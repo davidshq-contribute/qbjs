@@ -2507,12 +2507,7 @@ var QB = new function() {
         if (!preventNewline) {
             _locX = 0;
             _lastTextX = 0;
-            if (_locY < _textRows()-1) {
-                _locY = _locY + 1;
-            }
-            else {
-                await _printScroll();
-            }
+            _printNewLine();
         }
 
         if (values.length < 2) {
@@ -3453,12 +3448,7 @@ var QB = new function() {
                     var f = _fonts[_font];
                     ctx.font = f.size + " " + f.name;
                     if (x + ctx.measureText(String(str)).width > _width()) {
-                        if (_locY < _textRows()-1) {
-                            _locY++;
-                        }
-                        else {
-                            await _printScroll();
-                        }
+                        _printNewLine();
                         _locX = 0;
                         x = 0;
                     }
@@ -3477,15 +3467,9 @@ var QB = new function() {
                         var subline = sublines[j];
 
                         if (j > 0) {
-                            if (_locY < _textRows()-2) {
-                                _locY++;
-                                _locX = 0;
-                                x = 0;
-                            }
-                            else {
-                                _locY--;
-                                await _printScroll();
-                            }
+                            _printNewLine();
+                            _locX = 0;
+                            x = 0;
                         }
                         var y =  _locY * QB.func__FontHeight();
 
@@ -3506,14 +3490,9 @@ var QB = new function() {
                     }
 
                     if (i < lines.length-1) {
-                        if (_locY < _textRows()-1) {
-                            _locY++;
-                            _locX = 0;
-                            x = 0;
-                        }
-                        else {
-                            await _printScroll();
-                        }
+                        _printNewLine();
+                        _locX = 0;
+                        x = 0;
                     }
                 }
             }
@@ -3524,12 +3503,7 @@ var QB = new function() {
         if (!preventNewline) {
             _locX = 0;
             _lastTextX = 0;
-            if (_locY < _textRows()-1) {
-                _locY = _locY + 1;
-            }
-            else {
-                await _printScroll();
-            }
+            _printNewLine();
         }
     };
 
@@ -3741,13 +3715,38 @@ var QB = new function() {
         return lines;
     }
 
-    async function _printScroll() {
+    // Moves the text cursor down to the next line. As in QB64, the last row is not part of the area
+    // that scrolls. From either of the last two rows, the rows above the last one move up, and the
+    // cursor is left on the row before the last.
+    function _printNewLine() {
+        var bottom = _scrollRows() - 1;
+        if (_locY < bottom) {
+            _locY++;
+        }
+        else {
+            _printScroll();
+            _locY = bottom;
+        }
+    }
+
+    // How many rows scroll: all but the last one. A screen of one or two rows scrolls whole.
+    function _scrollRows() {
+        var rows = _textRows();
+        return rows > 2 ? rows - 1 : rows;
+    }
+
+    // Moves the rows that scroll up by one row. The row that comes in is filled with the background
+    // color, as in QB64.
+    function _printScroll() {
         var ctx = _images[_activeImage].ctx;
-        ctx.globalCompositeOperation = "copy";
-        ctx.imageSmoothingEnabled = false;
-        ctx.drawImage(ctx.canvas, 0, -QB.func__FontHeight(), ctx.canvas.width, ctx.canvas.height);
-        ctx.globalCompositeOperation = "source-over";
-        _scrollScreenText();
+        var fh = QB.func__FontHeight();
+        var rows = _scrollRows();
+        if (rows > 1) {
+            ctx.putImageData(ctx.getImageData(0, fh, ctx.canvas.width, (rows - 1) * fh), 0, 0);
+        }
+        ctx.fillStyle = _bgColor.rgba();
+        ctx.fillRect(0, (rows - 1) * fh, ctx.canvas.width, fh);
+        _scrollScreenText(rows);
     }
 
     this.sub_PSet = function(sstep, x, y, color) {
@@ -4394,15 +4393,18 @@ var QB = new function() {
         }
     }
 
-    function _scrollScreenText() {
-        for (var i=1; i < _screenText.length; i++) {
+    // Moves the first rows of the text up by one row; rows is how many scroll.
+    function _scrollScreenText(rows) {
+        rows = Math.min(rows, _screenText.length);
+        if (rows < 1) { return; }
+        for (var i=1; i < rows; i++) {
             _screenText[i-1] = _screenText[i];
         }
         var col = [];
         for (var j=0; j < Math.floor(_width()/QB.func__FontWidth()); j++) {
             col.push({ text: " " });
         }
-        _screenText[_screenText.length-1] = col;
+        _screenText[rows-1] = col;
     }
 
     function _setScreenText(text) {
