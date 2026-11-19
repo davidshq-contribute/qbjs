@@ -116,10 +116,45 @@ UT.AssertEquals rndB&, 799
 rndD = 798.5001
 rndA% = rndD
 UT.AssertEquals rndA%, 799
+' MOD rounds both operands first (QB64pe gives 0, 2 and 0)
+Dim modX!
+modX! = 7.5
+UT.AssertEquals modX! Mod 2, 0
+UT.AssertEquals 6.5 Mod 4, 2
+UT.AssertEquals -7.5 Mod 2, 0
+' READ into an integer rounds the number read, as the double it is for every integer type (QB64pe
+' gives 2, 4, -2 and 2.5, then 799 and 799)
+Dim rdI%, rdL&, rdB As _Byte, rdS!
+Read rdI%, rdL&, rdB, rdS!
+UT.AssertEquals rdI%, 2
+UT.AssertEquals rdL&, 4
+UT.AssertEquals rdB, -2
+UT.AssertEquals rdS!, 2.5
+Read rdI%, rdL&
+UT.AssertEquals rdI%, 799
+UT.AssertEquals rdL&, 799
 $ROUNDING UP
 UT.AssertEquals rndHalf(2.5), 3
 rndA% = 2.5
 UT.AssertEquals rndA%, 3
+' without $ROUNDING EVEN, MOD keeps QBJS's own result for a fraction, and READ rounds as an assignment does
+UT.AssertEquals 7.5 Mod 2, 1.5
+Read rdI%, rdN%
+UT.AssertEquals rdI%, 3
+UT.AssertEquals rdN%, 4
+' MOD binds more tightly than + and -, and more loosely than *, / and \ (QB64pe gives 4, 5, 2 and 0 for
+' the first four, and 1 for 7 MOD -3)
+UT.AssertEquals 10 Mod 3 * 2, 4
+UT.AssertEquals 2 + 7 Mod 4, 5
+UT.AssertEquals 2 * 3 Mod 4, 2
+UT.AssertEquals 5 Mod 3 \ 2, 0
+UT.AssertEquals 17 Mod 5 Mod 3, 2
+UT.AssertEquals (3 + 4) Mod 5 - 1, 1
+UT.AssertEquals 7 Mod -3, 1
+UT.AssertTrue (9 Mod 3 = 0)
+Data 2.5,3.5,-2.5,2.5
+Data 798.5000000000001,798.5000000000001
+Data 2.5,3.5
 
 ' DEFINT, DEFLNG, DEFSNG, DEFDBL, DEFSTR and _DEFINE give a name without a suffix its type, from the
 ' letters given, for the lines that follow (and for the procedures that follow)
@@ -159,17 +194,18 @@ UT.AssertEquals tt, 2.5
 UT.AssertEquals bAddOne(1.4), 1
 UT.AssertEquals dtTwice(2.6), 5.2
 
-' a comparison stored in an integer is -1 for true and 0 for false, so NOT of it is 0 and -1 (not -2 and -1)
+' without $BOOLEANS QB a comparison stored in an integer is JavaScript's 1 for true and 0 for false
+' (QB gives -1; qb-booleans.bas has the switch on)
 Dim cmpInt As Integer, cmpLng As Long
 cmpInt = 3 > 2
-UT.AssertEquals cmpInt, -1
+UT.AssertEquals cmpInt, 1
 cmpInt = 3 < 2
 UT.AssertEquals cmpInt, 0
 cmpLng = (3 > 2)
-UT.AssertEquals cmpLng, -1
-UT.AssertEquals bPositive(5), -1
+UT.AssertEquals cmpLng, 1
+UT.AssertEquals bPositive(5), 1
 UT.AssertEquals bPositive(-5), 0
-UT.AssertEquals Not bPositive(5), 0
+UT.AssertEquals Not bPositive(5), -2
 UT.AssertEquals Not bPositive(-5), -1
 UT.AssertTrue (Not bPositive(-5) Or bPositive(-5))
 

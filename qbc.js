@@ -5,7 +5,7 @@ async function compile(src) {
     const fs = require("fs");
 
     const sourceFile = process.argv[2];
-    const data = fs.readFileSync(sourceFile, "utf8");
+    const data = require("./qb-console.js").QB().readSource(sourceFile);
 
     var result = "";
     if (sourceFile.endsWith("qb2js.bas")) {

@@ -99,6 +99,17 @@ Close #1
 Kill "test.txt"
 UT.AssertEquals bstr, "-1  0 "
 
+' a JavaScript true stored in an integer is -1 here too (without the switch it is 1, as in qb-lang.bas)
+Dim bj As Integer
+$If Javascript Then
+    bj = QB.roundInt(true);
+$End If
+UT.AssertEquals bj, -1
+' the setting is for the whole run, so give the test modules after this one QBJS's default again
+$If Javascript Then
+    QB.setQBBooleans(false);
+$End If
+
 Console.Echo "QB Booleans - tests completed with no errors* in " + (Sys.TimeInMillis - ts) + " millisecond(s)"
 
 Function BoolBoth (a As Integer, b As Integer)

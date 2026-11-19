@@ -264,6 +264,7 @@ Sub Compile (source As String, moduleName As String, selfConvert)
     If Not selfConvert And moduleName = "" Then AddJSLine 0, "QB.start();"
     If Not selfConvert And moduleName = "" And optionRoundHalfEven Then AddJSLine 0, "QB.setRoundHalfEven(true);"
     If Not selfConvert And moduleName = "" And optionQBLines Then AddJSLine 0, "QB.setQBLines(true);"
+    If Not selfConvert And moduleName = "" And optionQBBooleans Then AddJSLine 0, "QB.setQBBooleans(true);"
 
     If Not selfConvert And moduleName = "" Then
         Dim mtest As Method
@@ -413,7 +414,7 @@ Sub SetRoundHalfEven ()
 End Sub
 
 ' The compiler option for lines of whole pixels, one wide, as QB draws them, instead of QBJS's smoothed
-' canvas strokes. So far DRAW follows it. The $LINES QB metacommand does the same from inside a program.
+' canvas strokes. DRAW and LINE follow it. The $LINES QB metacommand does the same from inside a program.
 Sub SetQBLines ()
     optionQBLines = True
 End Sub
@@ -866,6 +867,8 @@ Sub ConvertLines (firstLine As Integer, lastLine As Integer, functionName As Str
                 second = ""
                 If UBound(parts) > 1 Then second = UCase$(String.Trim(parts(2)))
                 If second <> "QB" Then AddWarning i, "Expected $BOOLEANS QB"
+                ' and a comparison stored in an integer gives -1 for true, not JavaScript's 1
+                If second = "QB" Then js = "QB.setQBBooleans(true);"
 
             ElseIf first = "$LINES" Then
                 ' $LINES QB draws lines of whole pixels, as QB does; $LINES SMOOTH (the default) strokes
@@ -1403,7 +1406,19 @@ Function ConvertSub$ (m As Method, args As String, lineNumber As Integer)
         js = CallMethod(m) + "(" + ConvertOpen(args, lineNumber) + ");"
 
     ElseIf m.name = "Close" Then
-        js = CallMethod(m) + "(" + String.Replace(args, "#", "") + ");"
+        ' CLOSE alone closes every file; CLOSE #1, #f% closes each file named, one call each
+        If String.Trim(args) = "" Then
+            js = CallMethod(m) + "();"
+        Else
+            ReDim closeParts(0) As String
+            Dim As Integer closeCount, closeIdx
+            closeCount = ListSplit(args, closeParts())
+            js = ""
+            For closeIdx = 1 To closeCount
+                If closeIdx > 1 Then js = js + " "
+                js = js + CallMethod(m) + "(" + ConvertFileNumber(closeParts(closeIdx), lineNumber) + ");"
+            Next closeIdx
+        End If
 
         'ElseIf m.name = "Get" Then
         '    js = ConvertGet(m, args, lineNumber)
@@ -1560,7 +1575,7 @@ Function ConvertPut$ (m As Method, args As String, lineNumber As Integer)
     vname = String.Trim(parts(3))
     vname = String.Replace(vname, "()", "")
 
-    fh = String.Replace(fh, "#", "")
+    fh = ConvertFileNumber(fh, lineNumber)
     If position = "" Then position = "undefined"
 
     Dim v As Variable
@@ -1648,9 +1663,18 @@ Function ConvertOpen$ (args As String, lineNumber As Integer)
 
     filename = String.Trim(ConvertExpression(Join(parts(), 1, forIdx - 1, " "), lineNumber))
     mode = "QB." + UCase$(parts(forIdx + 1))
-    handle = String.Trim(ConvertExpression(String.Replace(parts(asIdx + 1), "#", ""), lineNumber))
+    handle = ConvertFileNumber(parts(asIdx + 1), lineNumber)
 
     ConvertOpen = filename + ", " + mode + ", " + handle
+End Function
+
+' A file number: #1, 1, #f or #f%. Only the # in front is taken off, so that a variable's own suffix (n%,
+' d#) stays for ConvertExpression, which gives the variable's JavaScript name.
+Function ConvertFileNumber$ (text As String, lineNumber As Integer)
+    Dim fn As String
+    fn = String.Trim(text)
+    If String.StartsWith(fn, "#") Then fn = Mid$(fn, 2)
+    ConvertFileNumber = String.Trim(ConvertExpression(fn, lineNumber))
 End Function
 
 ' OPEN mode, [#]handle, file [, record length], where the mode is a string of I, O, A, R or B
@@ -1680,7 +1704,7 @@ Function ConvertOpenOriginal$ (args As String, lineNumber As Integer)
         Exit Function
     End If
 
-    ConvertOpenOriginal = String.Trim(ConvertExpression(parts(3), lineNumber)) + ", " + mode + ", " + String.Trim(ConvertExpression(String.Replace(parts(2), "#", ""), lineNumber))
+    ConvertOpenOriginal = String.Trim(ConvertExpression(parts(3), lineNumber)) + ", " + mode + ", " + ConvertFileNumber(parts(2), lineNumber)
 End Function
 
 Function ConvertLine$ (args As String, lineNumber As Integer)
@@ -1930,8 +1954,16 @@ Function ConvertRead$ (m As Method, args As String, lineNumber As Integer)
     vname = GenJSVar
     js = "var " + vname + " = new Array(" + Str$(UBound(vars)) + "); " '+ LF
     js = js + CallMethod(m) + "(" + vname + "); " '+ LF
+    Dim target As String
     For i = 1 To UBound(vars)
-        js = js + ConvertExpression(vars(i), lineNumber) + " = " + vname + "[" + Str$(i - 1) + "]; " '+ LF
+        ' converted first, so that a variable first used here is declared before its type is asked for
+        target = ConvertExpression(vars(i), lineNumber)
+        If IsIntegerVar(vars(i)) Then
+            ' QB64 rounds the number read as the double it is (798.5000000000001 is 799 in an INTEGER and a LONG)
+            js = js + target + " = QB.roundLong(" + vname + "[" + Str$(i - 1) + "]); "
+        Else
+            js = js + target + " = " + vname + "[" + Str$(i - 1) + "]; " '+ LF
+        End If
     Next i
     ConvertRead$ = js
 End Function
@@ -2032,7 +2064,7 @@ Function ConvertPrint$ (m As Method, args As String, lineNumber As Integer)
     m.jsname = "QB.sub_Print"
     If pcount > 0 Then
         If String.StartsWith(String.Trim(parts(1)), "#") Then
-            fh = String.Replace(String.Trim(parts(1)), "#", "")
+            fh = ConvertFileNumber(parts(1), lineNumber)
             m.jsname = "QB.sub_PrintToFile"
             startIdx = 3
             If String.Trim(parts(2)) <> "," Then
@@ -2113,7 +2145,7 @@ Function ConvertWrite$ (m As Method, args As String, lineNumber As Integer)
     m.jsname = "QB.sub_Write"
     If pcount > 0 Then
         If String.StartsWith(String.Trim(parts(1)), "#") Then
-            fh = String.Replace(String.Trim(parts(1)), "#", "")
+            fh = ConvertFileNumber(parts(1), lineNumber)
             m.jsname = "QB.sub_WriteToFile"
             startIdx = 2
         End If
@@ -2191,7 +2223,7 @@ Function ConvertFileLineInput$ (m As Method, args As String, lineNumber As Integ
         Exit Function
     End If
 
-    fh = String.Replace(String.Trim(parts(1)), "#", "")
+    fh = ConvertFileNumber(parts(1), lineNumber)
     retvar = String.Trim(parts(2))
 
     vname = GenJSVar
@@ -2240,14 +2272,17 @@ Function ConvertInput$ (m As Method, args As String, lineNumber As Integer)
     For i = 1 To UBound(vars)
         ' Convert to appropriate variable type on assignment
         Dim vartype As String
+        Dim target As String
+        ' converted first, so that a variable first used here is declared before its type is asked for
+        target = ConvertExpression(vars(i), lineNumber)
         vartype = GetVarType(vars(i))
         If vartype = "_BIT" Or vartype = "_BYTE" Or vartype = "INTEGER" Or vartype = "LONG" Or vartype = "_INTEGER64" Or vartype = "_OFFSET" Or _
            vartype = "_UNSIGNED _BIT" Or vartype = "_UNSIGNED _BYTE" Or vartype = "_UNSIGNED INTEGER" Or vartype = "_UNSIGNED LONG" Or vartype = "_UNSIGNED _INTEGER64" Or vartype = "_UNSIGNED _OFFSET" Then
-            js = js + ConvertExpression(vars(i), lineNumber) + " = QB.toInteger(" + vname + "[" + Str$(i - 1) + "]" + ToIntegerWide(vartype) + "); "
+            js = js + target + " = QB.toInteger(" + vname + "[" + Str$(i - 1) + "]" + ToIntegerWide(vartype) + "); "
         ElseIf vartype = "SINGLE" Or vartype = "DOUBLE" Or vartype = "_FLOAT" Then
-            js = js + ConvertExpression(vars(i), lineNumber) + " = QB.toFloat(" + vname + "[" + Str$(i - 1) + "]); "
+            js = js + target + " = QB.toFloat(" + vname + "[" + Str$(i - 1) + "]); "
         Else
-            js = js + ConvertExpression(vars(i), lineNumber) + " = " + vname + "[" + Str$(i - 1) + "]; "
+            js = js + target + " = " + vname + "[" + Str$(i - 1) + "]; "
         End If
         'End If
     Next i
@@ -2269,7 +2304,7 @@ Function ConvertFileInput$ (m As Method, args As String, lineNumber As Integer)
         Exit Function
     End If
 
-    fh = String.Replace(String.Trim(parts(1)), "#", "")
+    fh = ConvertFileNumber(parts(1), lineNumber)
     retvar = String.Trim(parts(2))
 
     vname = GenJSVar
@@ -2282,16 +2317,19 @@ Function ConvertFileInput$ (m As Method, args As String, lineNumber As Integer)
         If i > 2 Then numeric = numeric + ","
         ' Convert to appropriate variable type on assignment
         Dim vartype As String
+        Dim target As String
+        ' converted first, so that a variable first used here is declared before its type is asked for
+        target = ConvertExpression(parts(i), lineNumber)
         vartype = GetVarType(parts(i))
         If vartype = "_BIT" Or vartype = "_BYTE" Or vartype = "INTEGER" Or vartype = "LONG" Or vartype = "_INTEGER64" Or vartype = "_OFFSET" Or _
            vartype = "_UNSIGNED _BIT" Or vartype = "_UNSIGNED _BYTE" Or vartype = "_UNSIGNED INTEGER" Or vartype = "_UNSIGNED LONG" Or vartype = "_UNSIGNED _INTEGER64" Or vartype = "_UNSIGNED _OFFSET" Then
-            assigns = assigns + ConvertExpression(parts(i), lineNumber) + " = QB.toInteger(" + vname + "[" + Str$(i - 2) + "]" + ToIntegerWide(vartype) + "); "
+            assigns = assigns + target + " = QB.toInteger(" + vname + "[" + Str$(i - 2) + "]" + ToIntegerWide(vartype) + "); "
             numeric = numeric + "true"
         ElseIf vartype = "SINGLE" Or vartype = "DOUBLE" Or vartype = "_FLOAT" Then
-            assigns = assigns + ConvertExpression(parts(i), lineNumber) + " = QB.toFloat(" + vname + "[" + Str$(i - 2) + "]); "
+            assigns = assigns + target + " = QB.toFloat(" + vname + "[" + Str$(i - 2) + "]); "
             numeric = numeric + "true"
         Else
-            assigns = assigns + ConvertExpression(parts(i), lineNumber) + " = " + vname + "[" + Str$(i - 2) + "]; "
+            assigns = assigns + target + " = " + vname + "[" + Str$(i - 2) + "]; "
             numeric = numeric + "false"
         End If
     Next i
@@ -2763,6 +2801,7 @@ Function ConvertExpression$ (ex As String, lineNumber As Integer)
     Dim bvar As Variable
     Dim m As Method
     Dim intdiv As Integer
+    Dim hasMod As Integer
     ' $BOOLEANS QB: the stretch of the expression since the last logical operator or comma starts at
     ' segStart in js, and segCmp says whether it holds a comparison. A comparison binds more loosely than
     ' arithmetic and more tightly than NOT, AND, OR and XOR, so such a stretch is the comparison with its
@@ -2810,7 +2849,8 @@ Function ConvertExpression$ (ex As String, lineNumber As Integer)
                 ElseIf uword = "ORELSE" Or uword = "_ORELSE" Then
                     js = js + " || "
                 ElseIf uword = "MOD" Then
-                    js = js + " % "
+                    js = js + " " + Chr$(3) + " " ' a mark, which ConvertMod turns into QB.mod(left, right) at the end
+                    hasMod = True
                 ElseIf uword = "XOR" Then
                     js = js + " ^ "
                 ElseIf uword = "EQV" Then
@@ -3000,6 +3040,9 @@ Function ConvertExpression$ (ex As String, lineNumber As Integer)
     If intdiv Then
         js = ConvertIntDiv(js)
     End If
+    If hasMod Then
+        js = ConvertMod(js)
+    End If
     If booleans Then
         ' The marks of CloseCompare, each a word of its own, so that ConvertIntDiv passed over them
         js = String.Replace(js, " " + Chr$(1) + " ", " QB.toBoolean(")
@@ -3096,6 +3139,96 @@ Function ConvertIntDiv$ (s As String)
     Wend
     
     ConvertIntDiv = s
+End Function
+
+' MOD. ConvertExpression marks each MOD with Chr$(3), and this turns "a <mark> b" into "QB.mod(a, b)", from
+' the leftmost mark on, since MOD groups from the left. MOD binds more loosely than ^, *, / and \ and more
+' tightly than + and -, so each operand runs over those, up to a + or - that is not a sign, a comparison, a
+' logical operator, a comma or the edge of a group. So 10 MOD 3 * 2 is 10 MOD 6, as in QB. (A number such as
+' 1E+1 is already split into 1E + 1 before this, so it is not handled here.)
+Function ConvertMod$ (s As String)
+    Dim As Integer idx, sidx, eidx
+    idx = InStr(s, Chr$(3))
+    While idx > 0
+        sidx = ModOperandStart(s, idx)
+        eidx = ModOperandEnd(s, idx)
+        s = Left$(s, sidx - 1) + " QB.mod(" + Mid$(s, sidx, idx - sidx) + "," + Mid$(s, idx + 1, eidx - idx) + ") " + Mid$(s, eidx + 1)
+        idx = InStr(s, Chr$(3))
+    Wend
+    ConvertMod = s
+End Function
+
+' Where the left operand of the MOD mark at idx starts
+Function ModOperandStart (s As String, idx As Integer)
+    Dim As Integer i, depth
+    Dim As String c, q
+    For i = idx - 1 To 1 Step -1
+        c = Mid$(s, i, 1)
+        If q <> "" Then
+            If c = q Then q = ""
+        ElseIf c = Chr$(34) Or c = "'" Then
+            q = c
+        ElseIf c = ")" Or c = "]" Then
+            depth = depth + 1
+        ElseIf c = "(" Or c = "[" Then
+            If depth = 0 Then Exit For
+            depth = depth - 1
+        ElseIf depth = 0 Then
+            If IsModOperandEnd(c) Then Exit For
+            If (c = "+" Or c = "-") AndAlso IsBinarySign(s, i) Then Exit For
+        End If
+    Next i
+    ModOperandStart = i + 1
+End Function
+
+' Where the right operand of the MOD mark at idx ends
+Function ModOperandEnd (s As String, idx As Integer)
+    Dim As Integer i, depth
+    Dim As String c, q
+    For i = idx + 1 To Len(s)
+        c = Mid$(s, i, 1)
+        If q <> "" Then
+            If c = q Then q = ""
+        ElseIf c = Chr$(34) Or c = "'" Then
+            q = c
+        ElseIf c = "(" Or c = "[" Then
+            depth = depth + 1
+        ElseIf c = ")" Or c = "]" Then
+            If depth = 0 Then Exit For
+            depth = depth - 1
+        ElseIf depth = 0 Then
+            If IsModOperandEnd(c) Then Exit For
+            If (c = "+" Or c = "-") AndAlso IsBinarySign(s, i) Then Exit For
+        End If
+    Next i
+    ModOperandEnd = i - 1
+End Function
+
+' A character of the converted expression that ends an operand of MOD: a comma, a comparison, a logical
+' operator, another MOD mark, or a mark of $BOOLEANS QB
+Function IsModOperandEnd (c As String)
+    IsModOperandEnd = (c = "," Or c = "=" Or c = "<" Or c = ">" Or c = "!" Or c = "&" Or c = "|" Or _
+        c = "^" Or c = "~" Or c = "?" Or c = ":" Or c = ";" Or c = Chr$(1) Or c = Chr$(2) Or c = Chr$(3))
+End Function
+
+' Whether the + or - at i of s is an operator between two operands, not a sign (-b, a * -b): the nearest
+' character before it that is not a space ends an operand. (No Not here: this compiler is built without
+' $BOOLEANS QB, where Not of comparisons joined by Or is always true.)
+Function IsBinarySign (s As String, i As Integer)
+    Dim j As Integer
+    Dim c As String
+    IsBinarySign = False
+    j = i - 1
+    While j > 0 AndAlso Mid$(s, j, 1) = " "
+        j = j - 1
+    Wend
+    If j > 0 Then
+        c = UCase$(Mid$(s, j, 1))
+        If (c >= "A" AndAlso c <= "Z") OrElse (c >= "0" AndAlso c <= "9") OrElse c = "_" OrElse c = "$" OrElse _
+           c = "." OrElse c = ")" OrElse c = "]" OrElse c = Chr$(34) OrElse c = "'" Then
+            IsBinarySign = True
+        End If
+    End If
 End Function
 
 

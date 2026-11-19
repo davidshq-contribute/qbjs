@@ -215,6 +215,35 @@ UT.AssertTrue fill <> white
 UT.AssertEquals Point(101, 109), fill
 UT.AssertEquals Point(111, 105), black
 UT.AssertEquals Point(99, 105), black
+' With $LINES QB, LINE sets whole pixels too: one wide and to the last pixel, a BF box given corner to
+' corner either way round, fractions rounded, a style pattern, and a B box that PAINT stays inside.
+' QB64pe gives the same results.
+Cls 0
+Line (20, 20)-(30, 20), 15
+UT.AssertEquals Point(30, 20), white
+UT.AssertEquals Point(31, 20), black
+UT.AssertEquals Point(25, 19), black
+UT.AssertEquals Point(25, 21), black
+Line (30, 30)-(20, 35), 15, BF
+UT.AssertEquals Point(20, 30), white
+UT.AssertEquals Point(30, 35), white
+UT.AssertEquals Point(19, 32), black
+UT.AssertEquals Point(31, 32), black
+Line (40.4, 30.4)-(50.6, 30.4), 15
+UT.AssertEquals Point(40, 30), white
+UT.AssertEquals Point(51, 30), white
+UT.AssertEquals Point(0), 51
+Line (5, 40)-(55, 40), 15, , &HF0F0
+UT.AssertEquals Point(5, 40), white
+UT.AssertEquals Point(8, 40), white
+UT.AssertEquals Point(9, 40), black
+UT.AssertEquals Point(13, 40), white
+Line (100, 100)-(120, 110), 15, B
+Paint (110, 105), 9, 15
+UT.AssertEquals Point(110, 105), fill
+UT.AssertEquals Point(121, 105), black
+UT.AssertEquals Point(110, 111), black
+
 ' a program that sets a line width (LineWidth of the Graphics 2D library) keeps the canvas strokes
 $If Javascript Then
     QB.defaultLineWidth(2);

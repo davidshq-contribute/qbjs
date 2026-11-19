@@ -361,8 +361,8 @@ var QB = new function() {
     };
 
     // QBJS strokes its lines on the canvas, which smooths them and makes them two pixels wide.
-    // setQBLines(true) makes DRAW set whole pixels, one wide, as QB does, so that PAINT finds a
-    // border drawn by DRAW. It is off by default, and a program that sets a line width (LineWidth of
+    // setQBLines(true) makes DRAW and LINE set whole pixels, one wide, as QB does, so that PAINT finds
+    // a border drawn by them. It is off by default, and a program that sets a line width (LineWidth of
     // the Graphics 2D library) keeps the canvas strokes.
     var _qbLines = false;
     var _lineWidthSet = false;
@@ -371,13 +371,21 @@ var QB = new function() {
         _qbLines = !!on;
     };
 
+    // A comparison stored in an integer gives JavaScript's 1 for true. setQBBooleans(true), which the
+    // booleans setting ($BOOLEANS QB or --qb-booleans) turns on, gives QB's -1 instead.
+    var _qbBooleans = false;
+
+    this.setQBBooleans = function(on) {
+        _qbBooleans = !!on;
+    };
+
     // roundLong is for a LONG or a wider integer, roundInt for an INTEGER, a _BYTE or a _BIT. QB64 rounds a
     // value for an integer of 16 bits or less as a single (798.50001 is 798.5, and 798), and for a wider
     // one as the double it is (799), so with setRoundHalfEven(true) roundInt does the same.
     this.roundLong = function(value) {
-        // a comparison gives a JavaScript boolean; QB's true is -1, so that NOT gives 0 for it
+        // a comparison gives a JavaScript boolean: 1 for true, or QB's -1 with setQBBooleans(true)
         if (typeof value == "boolean") {
-            return value ? -1 : 0;
+            return value ? (_qbBooleans ? -1 : 1) : 0;
         }
         var r = Math.round(value);
         if (_roundHalfEven && Math.abs(value % 1) === 0.5 && r % 2 !== 0) {
@@ -391,6 +399,16 @@ var QB = new function() {
             value = Math.fround(value);
         }
         return QB.roundLong(value);
+    };
+
+    // MOD. With setRoundHalfEven(true) both operands are rounded to integers first, as QB does
+    // (7.5 MOD 2 is 8 MOD 2, which is 0; 6.5 MOD 4 is 6 MOD 4, which is 2).
+    this.mod = function(a, b) {
+        if (_roundHalfEven) {
+            a = QB.roundLong(a);
+            b = QB.roundLong(b);
+        }
+        return a % b;
     };
 
     this.toFloat = function(value) {
@@ -456,10 +474,11 @@ var QB = new function() {
         _fonts[16] = { name: "dosvga", size: "16px", style: "", offset: 4, monospace: true, height: 16, width: 8 };
         GX.vfsCwd(GX.vfs().rootDirectory());
         _fileHandles = {};
-        // a run starts with QBJS's rounding and lines, no view port and an empty PEEK and POKE memory
+        // a run starts with QBJS's rounding, lines and booleans, no view port and an empty PEEK and POKE memory
         _roundHalfEven = false;
         _qbLines = false;
         _lineWidthSet = false;
+        _qbBooleans = false;
         _viewport = undefined;
         _defSeg = 0;
         _peekPokeMemory = {};
@@ -2729,10 +2748,41 @@ var QB = new function() {
         screen.lastX = ex;
         screen.lastY = ey;
 
-        if (pattern != undefined) { 
+        if (pattern != undefined) {
             if (typeof pattern == "number") {
                 var value = pattern;
             }
+        }
+
+        // With setQBLines(true), as in QB64, the corners are rounded to pixels: a line or the four sides of
+        // a B box are set pixel by pixel, each side starting the style pattern again, and a BF box fills
+        // every pixel from one corner to the other, whichever way round they are given.
+        if (_qbLines && !_lineWidthSet) {
+            var origin = _viewOrigin();
+            var x1 = QB.roundLong(sx) + origin.x, y1 = QB.roundLong(sy) + origin.y;
+            var x2 = QB.roundLong(ex) + origin.x, y2 = QB.roundLong(ey) + origin.y;
+            if (style == "BF") {
+                if (!screen.cached) {
+                    screen.imgdata = screen.ctx.getImageData(0, 0, screen.canvas.width, screen.canvas.height);
+                    screen.cached = true;
+                }
+                var left = Math.max(0, Math.min(x1, x2)), right = Math.min(screen.canvas.width - 1, Math.max(x1, x2));
+                var top = Math.max(0, Math.min(y1, y2)), bottom = Math.min(screen.canvas.height - 1, Math.max(y1, y2));
+                for (var py = top; py <= bottom; py++) {
+                    for (var px = left; px <= right; px++) {
+                        _setPixel(screen, px, py, color);
+                    }
+                }
+            } else if (style == "B") {
+                _pixelLine(screen, x1, y1, x2, y1, color, value);
+                _pixelLine(screen, x2, y1, x2, y2, color, value);
+                _pixelLine(screen, x2, y2, x1, y2, color, value);
+                _pixelLine(screen, x1, y2, x1, y1, color, value);
+            } else {
+                _pixelLine(screen, x1, y1, x2, y2, color, value);
+            }
+            _strokeDrawColor = _color(color);
+            return;
         }
 
         var ctx = screen.ctx;
@@ -3689,10 +3739,13 @@ var QB = new function() {
         screen.imgdata.data[pixelIndex + 3] = color.a * 255;
     };
 
-    // Sets the pixels of a line from (x1, y1) to (x2, y2), whole screen pixels, as QB64 draws DRAW's lines:
+    // Sets the pixels of a line from (x1, y1) to (x2, y2), whole screen pixels, as QB64 draws its lines:
     // it steps along the longer axis and rounds the other, kept as a single, half away from zero. Pixels
-    // outside the screen or the view port are skipped.
-    function _pixelLine(screen, x1, y1, x2, y2, color) {
+    // outside the screen or the view port are skipped. A style (LINE's 16-bit pattern) is turned left
+    // one bit before each pixel, which is set when the low bit is 1. QB64 first cuts a line to the view
+    // port and steps from there, so where a line crosses the port's edge a pixel can differ by one.
+    function _pixelLine(screen, x1, y1, x2, y2, color, style) {
+        var bits = (style == undefined) ? 0xFFFFFFFF : (((style & 0xFFFF) | ((style & 0xFFFF) << 16)) >>> 0);
         if (!screen.cached) {
             screen.imgdata = screen.ctx.getImageData(0, 0, screen.canvas.width, screen.canvas.height);
             screen.cached = true;
@@ -3715,11 +3768,12 @@ var QB = new function() {
         }
         for (i = 0; i <= n; i++) {
             var r = Math.trunc(Math.fround(f < 0 ? f - 0.5 : f + 0.5));
+            bits = ((bits << 1) | (bits >>> 31)) >>> 0;
             if (dx > dy) {
-                _setPixel(screen, x1, r, color);
+                if (bits & 1) { _setPixel(screen, x1, r, color); }
                 x1 += dir;
             } else {
-                _setPixel(screen, r, y1, color);
+                if (bits & 1) { _setPixel(screen, r, y1, color); }
                 y1 += dir;
             }
             f = Math.fround(f + step);
