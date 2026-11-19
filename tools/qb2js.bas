@@ -378,8 +378,9 @@ Sub SetSelfConvert ()
 End Sub
 
 ' The compiler option for sound as QB64 makes it: every dot after a PLAY note counts, there are 18.2
-' clock ticks to a second, and SOUND and BEEP are as loud as PLAY. The $SOUND QB metacommand does the
-' same from inside a program.
+' clock ticks to a second, SOUND and BEEP are as loud as PLAY, PLAY and SOUND play one after another
+' in one queue, and MB plays in the background. The $SOUND QB metacommand does the same from inside a
+' program.
 Sub SetQBSound ()
     optionQBSound = True
 End Sub

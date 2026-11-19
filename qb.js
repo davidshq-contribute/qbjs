@@ -10,8 +10,68 @@ var QB = new function() {
             this.mode = 7 / 8;
             this.foreground = true;
             this.type = 'square';
+            // With setQBSound(true), PLAY and SOUND share one queue, as in QB64: each tone starts when the
+            // one before it ends. nextTime is when the queue ends, on the clock that time() gives.
+            this.nextTime = 0;
+            this.unlocked = false;
         }
-    
+
+        // Whether tones can be heard. The browser holds the audio of a page until it has had a key
+        // press, a click or a touch; unlock() is called on the first of them.
+        heard(ctx) {
+            return this.unlocked || ctx.state == "running";
+        }
+
+        unlock() {
+            if (!this.unlocked) {
+                this.unlocked = true;
+                this.nextTime = 0;
+            }
+        }
+
+        // The queue's clock in seconds: the audio clock, or the page's clock while the audio is held.
+        time(ctx) {
+            return this.heard(ctx) ? ctx.currentTime : performance.now() / 1000;
+        }
+
+        // Takes duration ms of the queue and returns the audio clock time at which they start, or null
+        // while the audio is held: then the time passes in silence, so that a tune held back does not
+        // play all at once on the first key. A note given with a comma starts with the next one, so it
+        // does not move the queue on (advance false).
+        reserve(ctx, duration, advance) {
+            const t = Math.max(this.time(ctx), this.nextTime);
+            if (advance) {
+                this.nextTime = t + duration / 1000;
+            }
+            return this.heard(ctx) ? t : null;
+        }
+
+        // How long the program waits for the queue, in ms. As in QB64: until 95 % of the time left,
+        // less a quarter of a second, has passed; not at all in the background (MB).
+        waitTime(ctx) {
+            if (!this.foreground) {
+                return 0;
+            }
+            return Math.max(0, ((this.nextTime - this.time(ctx)) * 0.95 - 0.25) * 1000);
+        }
+
+        // With setQBSound(true): queues a note of duration ms on ctx, the context SOUND uses; a 0
+        // frequency is a pause. The note sounds for its part given by the mode (MN, ML, MS).
+        queueNote(ctx, frequency, duration, advance) {
+            const t = this.reserve(ctx, duration, advance);
+            if (frequency != 0 && t !== null) {
+                const o = ctx.createOscillator();
+                const g = ctx.createGain();
+                o.connect(g);
+                g.connect(ctx.destination);
+                g.gain.value = 0.25;
+                o.frequency.value = frequency;
+                o.type = this.type;
+                o.start(t);
+                o.stop(t + duration * this.mode / 1000);
+            }
+        }
+
         stop() {
             if (this._audioContext && this._audioContext.state != "closed") {
                 this._audioContext.suspend();
@@ -142,7 +202,11 @@ var QB = new function() {
                     const freq = noteValue == 0
                         ? 0
                         : C6 * Math.pow(2, (noteValue - 48) / 12);
-                    if (nowait) {
+                    if (_qbSound) {
+                        this.queueNote(_soundCtx, freq, duration, !nowait);
+                        nowait = false;
+                    }
+                    else if (nowait) {
                         this.playSound(freq, duration);
                         nowait = false;
                     }
@@ -151,6 +215,11 @@ var QB = new function() {
                     }
                 }
                 match = reg.exec(commandString);
+            }
+            if (_qbSound) {
+                // as in QB64, the program waits for the queue unless it plays in the background (MB)
+                const wait = this.waitTime(_soundCtx);
+                if (wait > 0) { await delay(wait); }
             }
             if (this.foreground) {
                 await promise;
@@ -234,9 +303,11 @@ var QB = new function() {
     var _soundCtx = null;
     // QBJS's sound differs from QB64's in small ways that programs written for QBJS may rely on.
     // setQBSound(true), which $SOUND QB or the compiler option --qb-sound turns on, makes it as QB64's:
-    // every dot after a PLAY note counts, there are 18.2 clock ticks to a second, and SOUND and BEEP
-    // are as loud as PLAY. It is off by default.
+    // every dot after a PLAY note counts, there are 18.2 clock ticks to a second, SOUND and BEEP are as
+    // loud as PLAY, PLAY and SOUND play one after another in one queue, the program waits for the queue
+    // as in QB64, and not at all after MB. It is off by default.
     var _qbSound = false;
+    var _audioListening = false;
 
     this.setQBSound = function(on) {
         _qbSound = !!on;
@@ -366,6 +437,18 @@ var QB = new function() {
         _player = new QBasicSound();
         _soundCtx = new AudioContext();
         _qbSound = false;
+        if (!_audioListening) {
+            // With setQBSound(true): the browser holds a page's audio until the page has had a key
+            // press, a click or a touch. The first of them lets the queue play, and resumes the audio.
+            _audioListening = true;
+            ["keydown", "mousedown", "touchstart"].forEach(function(name) {
+                document.addEventListener(name, function() {
+                    if (!_qbSound) { return; }
+                    if (_player) { _player.unlock(); }
+                    if (_soundCtx && _soundCtx.state == "suspended") { _soundCtx.resume(); }
+                }, true);
+            });
+        }
         _controlChr = -1;
         // initialize the default fonts
         _nextFontId = 1000;
@@ -3960,6 +4043,17 @@ var QB = new function() {
         if (!valid_shapes.includes(shape.toLowerCase())) {
             throw new Error("Shape invalid - valid: " + valid_shapes.join(', '));
         }
+        // With setQBSound(true), the tone takes its turn in the queue it shares with PLAY, where a 0
+        // frequency is a silence, and the program waits as in QB64.
+        var t = null;
+        if (_qbSound) {
+            t = _player.reserve(_soundCtx, duration, true);
+            if (freq == 0 || t === null) {
+                var queueWait = _player.waitTime(_soundCtx);
+                if (queueWait > 0) { await GX.sleep(queueWait); }
+                return;
+            }
+        }
         if (freq == 0) {
             await GX.sleep(duration);
         } else {
@@ -3972,12 +4066,18 @@ var QB = new function() {
             gainNode.gain.value = gain;
             // The tone ends on the audio clock, so a busy page cannot make it longer. The times are in
             // seconds: duration is in milliseconds.
-            var t = _soundCtx.currentTime;
+            if (t === null) { t = _soundCtx.currentTime; }
             var seconds = duration / 1000;
             oscillator.start(t);
             gainNode.gain.setTargetAtTime(0, t + seconds, decay);
             oscillator.stop(t + seconds + decay + 1);
-            await GX.sleep(duration*2/3);
+            if (_qbSound) {
+                var wait = _player.waitTime(_soundCtx);
+                if (wait > 0) { await GX.sleep(wait); }
+            }
+            else {
+                await GX.sleep(duration*2/3);
+            }
         }
     };
 
