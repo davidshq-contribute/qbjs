@@ -3394,7 +3394,8 @@ var QB = new function() {
             }
             else {
                 var str = args[ai];
-                if (_isTabSpc(str)) {
+                var isTabSpc = _isTabSpc(str);
+                if (isTabSpc) {
                     str = _tabSpcText(str, _locX, "\n");
                 }
                 // non-negative numbers are prefixed with a space
@@ -3403,6 +3404,21 @@ var QB = new function() {
                         str = " " + str;
                     }
                     str = str + " "; //a space is added to the end numbers when printing
+                }
+                // as in QB, an item that does not fit on the rest of the line starts on the next one
+                if (!isTabSpc && _locX > 0) {
+                    var f = _fonts[_font];
+                    ctx.font = f.size + " " + f.name;
+                    if (x + ctx.measureText(String(str)).width > _width()) {
+                        if (_locY < _textRows()-1) {
+                            _locY++;
+                        }
+                        else {
+                            await _printScroll();
+                        }
+                        _locX = 0;
+                        x = 0;
+                    }
                 }
                 var lines = String(str).split("\n");
                 for (var i=0; i < lines.length; i++) {
