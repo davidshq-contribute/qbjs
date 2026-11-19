@@ -365,6 +365,19 @@ UT.AssertEquals RowText(28), 0
 UT.AssertEquals RowText(30), 1
 Cls 0
 
+' PAINT with no fill color fills with the foreground color, and stops at that color. QB64pe gives
+' the same results.
+Screen 12
+Dim pdWhite As Unsigned Long, pdBlue As Unsigned Long
+Line (0, 0)-(639, 479), 1, BF
+Color 15
+Line (100, 100)-(150, 150), , B
+pdWhite = Point(100, 100)
+pdBlue = Point(10, 10)
+Paint (125, 125)
+UT.AssertEquals Point(125, 125), pdWhite
+UT.AssertEquals Point(160, 125), pdBlue
+
 Console.Echo "QB Graphics - tests completed with no errors* in " + (Sys.TimeInMillis - ts) + " millisecond(s)"
 
 ' 1 when the text row of SCREEN 12 holds a pixel that is not the background, in its first 5 columns

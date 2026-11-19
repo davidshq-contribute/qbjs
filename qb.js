@@ -3190,7 +3190,13 @@ var QB = new function() {
             return;
         }
 
-        fillColor = _color(fillColor);
+        // as in QB, PAINT with no fill color fills with the current foreground color
+        if (fillColor == undefined) {
+            fillColor = _fgColor;
+        }
+        else {
+            fillColor = _color(fillColor);
+        }
         if (borderColor == undefined) {
             borderColor = fillColor;
         }
