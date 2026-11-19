@@ -1864,7 +1864,28 @@ var QB = new function() {
             var b = c & 0xFF;
             return _rgb(r, g, b, a/255);
         }
+        else if (!isNaN(c) && c < 0) {
+            // as in QB64, a negative color wraps around: into the palette of a screen mode that has
+            // one (-1 is 15 in SCREEN 12), else to a 32-bit color (-1 is opaque white)
+            var img = _images[_activeImage];
+            var mask = img ? _paletteMask(img.mode) : 0;
+            if (mask) {
+                return _colormap[parseInt(c) & mask];
+            }
+            if (img && img.mode != 0) {
+                return _color(parseInt(c) >>> 0);
+            }
+        }
         return _rgb(0,0,0);
+    }
+
+    // The largest color number of a screen mode with a palette, as QB64 masks colors to it, or 0
+    function _paletteMask(mode) {
+        if (mode == 2 || mode == 11) { return 1; }
+        if (mode == 1 || mode == 10) { return 3; }
+        if (mode == 7 || mode == 8 || mode == 9 || mode == 12) { return 15; }
+        if (mode == 13 || mode == 256) { return 255; }
+        return 0;
     }
 
     this.sub_Color = function(fg, bg) {
