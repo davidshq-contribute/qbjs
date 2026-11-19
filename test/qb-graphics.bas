@@ -69,6 +69,28 @@ UT.AssertEquals Point(50, 50), red
 UT.AssertEquals Point(200, 150), _RGB32(0, 0, 0)
 Color 15
 
+' A negative color wraps around: into the palette in SCREEN 12, where -1 is 15 and -2 is 14, and to a
+' 32-bit color in a 32-bit image, where -1 is opaque white. QB64pe gives the same results.
+Dim c15 As Unsigned Long, c14 As Unsigned Long, img32 As Long
+Cls 0
+PSet (0, 0), 15
+c15 = Point(0, 0)
+PSet (1, 0), 14
+c14 = Point(1, 0)
+Line (10, 10)-(20, 20), -1, BF
+Line (30, 10)-(40, 20), -2, BF
+UT.AssertEquals Point(15, 15), c15
+UT.AssertEquals Point(35, 15), c14
+img32 = _NewImage(40, 40, 32)
+_Dest img32
+_Source img32
+Line (10, 10)-(20, 20), -1, BF
+UT.AssertEquals Point(15, 15), _RGBA32(255, 255, 255, 255)
+_Dest 0
+_Source 0
+_FreeImage img32
+Cls 0
+
 ' GET (x1, y1)-(x2, y2), array saves a rectangle; PUT (x, y), array, action draws it back
 Dim saved(2000) As Integer
 Dim yellow As Unsigned Long, cyan As Unsigned Long
