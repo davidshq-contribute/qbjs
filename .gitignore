@@ -10,3 +10,4 @@ qbjs.zip
 .DS_Store
 test/headless/node_modules/
 test/headless/package-lock.json
+node_modules/
