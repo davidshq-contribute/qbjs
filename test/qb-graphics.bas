@@ -69,6 +69,30 @@ UT.AssertEquals Point(50, 50), red
 UT.AssertEquals Point(200, 150), _RGB32(0, 0, 0)
 Color 15
 
+' PRINT starts an item on the next line when it does not fit on the rest of this one. A number counts
+' with its spaces. An item that fits exactly stays, TAB is not moved, and an item longer than a whole
+' line is split. QB64pe gives the same results.
+Cls
+Locate 1, 78: Print 11;
+UT.AssertEquals Csrlin, 2
+UT.AssertEquals Pos(0), 5
+Locate 3, 77: Print 1;
+UT.AssertEquals Csrlin, 3
+UT.AssertEquals Pos(0), 80
+Print "xy";
+UT.AssertEquals Csrlin, 4
+UT.AssertEquals Pos(0), 3
+Locate 6, 75: Print "abc"; "defg";
+UT.AssertEquals Csrlin, 7
+UT.AssertEquals Pos(0), 5
+Locate 8, 75: Print "abc"; Tab(79); "z";
+UT.AssertEquals Csrlin, 8
+UT.AssertEquals Pos(0), 80
+Locate 10, 1: Print String$(85, "q");
+UT.AssertEquals Csrlin, 11
+UT.AssertEquals Pos(0), 6
+Cls
+
 ' GET (x1, y1)-(x2, y2), array saves a rectangle; PUT (x, y), array, action draws it back
 Dim saved(2000) As Integer
 Dim yellow As Unsigned Long, cyan As Unsigned Long
