@@ -199,6 +199,63 @@ Paint (110, 105), 9, 15
 UT.AssertEquals Point(110, 105), fill
 UT.AssertEquals Point(121, 105), black
 UT.AssertEquals Point(110, 111), black
+' With $LINES QB, CIRCLE sets whole pixels as QB64 does, so PAINT stays inside even a small circle.
+' Ellipses, arcs, and a line to the center for an angle below zero; with no aspect given, the aspect
+' of the screen mode. QB64pe gives the same results.
+Dim circleWhite As Unsigned Long
+Cls 0
+Circle (100, 100), 3, 15
+UT.AssertEquals Point(103, 100), white
+UT.AssertEquals Point(97, 100), white
+UT.AssertEquals Point(100, 103), white
+UT.AssertEquals Point(100, 97), white
+UT.AssertEquals Point(102, 102), white
+UT.AssertEquals Point(103, 101), white
+UT.AssertEquals Point(104, 100), black
+UT.AssertEquals Point(100, 100), black
+Paint (100, 100), 12, 15
+UT.AssertTrue Point(100, 100) <> black
+UT.AssertEquals Point(105, 100), black
+Cls 0
+Circle (100, 100), 10, 15
+UT.AssertEquals Point(110, 100), white
+UT.AssertEquals Point(90, 100), white
+UT.AssertEquals Point(100, 110), white
+UT.AssertEquals Point(100, 90), white
+UT.AssertEquals Point(107, 107), white
+UT.AssertEquals Point(93, 93), white
+UT.AssertEquals Point(111, 100), black
+UT.AssertEquals Point(109, 100), black
+Cls 0
+Circle (100, 100), 20, 15, , , .5
+UT.AssertEquals Point(120, 100), white
+UT.AssertEquals Point(80, 100), white
+UT.AssertEquals Point(100, 110), white
+UT.AssertEquals Point(100, 90), white
+UT.AssertEquals Point(100, 111), black
+Cls 0
+Circle (100, 100), 20, 15, 0, 1.5707963
+UT.AssertEquals Point(120, 100), white
+UT.AssertEquals Point(114, 86), white
+UT.AssertEquals Point(100, 80), black
+UT.AssertEquals Point(80, 100), black
+UT.AssertEquals Point(100, 120), black
+Cls 0
+Circle (100, 100), 20, 15, -.0001, -1.5707963
+UT.AssertEquals Point(110, 100), white
+UT.AssertEquals Point(100, 90), white
+UT.AssertEquals Point(100, 100), white
+UT.AssertEquals Point(90, 100), black
+Screen 13
+PSet (310, 190), 15
+circleWhite = Point(310, 190)
+Cls
+Circle (100, 100), 20, 15
+UT.AssertEquals Point(120, 100), circleWhite
+UT.AssertEquals Point(100, 83), circleWhite
+UT.AssertEquals Point(100, 117), circleWhite
+UT.AssertTrue Point(100, 80) <> circleWhite
+Screen 12
 
 ' a program that sets a line width (LineWidth of the Graphics 2D library) keeps the canvas strokes
 $If Javascript Then
