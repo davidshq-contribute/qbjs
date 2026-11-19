@@ -196,6 +196,37 @@ var QB = new function() {
         var target = Math.max(0, Math.round(item.__tab) - 1);
         return target < col ? newline + " ".repeat(target) : " ".repeat(target - col);
     }
+    // The text with each tab character replaced, for a cursor at column col (0 is the first) of a
+    // line of cols columns. As in QB64, a tab on the screen gives spaces up to the next tab stop;
+    // the stops are 8 columns apart. A tab with no stop left on its line gives a new line.
+    function _tabStopText(text, col, cols) {
+        var out = "";
+        for (var i=0; i < text.length; i++) {
+            var ch = text.charAt(i);
+            if (ch == "\n") {
+                out += ch;
+                col = 0;
+                continue;
+            }
+            if (col >= cols) { col = 0; }
+            if (ch == "\t") {
+                var stop = (Math.floor(col / 8) + 1) * 8;
+                if (stop >= cols) {
+                    out += "\n";
+                    col = 0;
+                }
+                else {
+                    out += " ".repeat(stop - col);
+                    col = stop;
+                }
+            }
+            else {
+                out += ch;
+                col++;
+            }
+        }
+        return out;
+    }
     this.STRETCH = Symbol("STRETCH");
     this.SQUAREPIXELS = Symbol("SQUAREPIXELS");
     this.APPEND = Symbol("APPEND");
@@ -3430,6 +3461,9 @@ var QB = new function() {
                         _locX = 0;
                         x = 0;
                     }
+                }
+                if (typeof str == "string" && str.indexOf("\t") > -1) {
+                    str = _tabStopText(str, _locX, _textColumns());
                 }
                 var lines = String(str).split("\n");
                 for (var i=0; i < lines.length; i++) {

@@ -114,6 +114,33 @@ Locate 10, 1: Print String$(85, "q");
 UT.AssertEquals Csrlin, 11
 UT.AssertEquals Pos(0), 6
 Cls
+' A tab character in PRINT moves to the next tab stop; the stops are 8 columns apart. It blanks the
+' columns it passes. With no stop left on the line, it starts the next line. QB64pe gives the same
+' results.
+Dim tabX As Integer, tabY As Integer, tabInk As Integer
+Print "abc" + Chr$(9) + "d";
+UT.AssertEquals Pos(0), 10
+Locate 2, 1: Print "abcdefgh" + Chr$(9) + "d";
+UT.AssertEquals Pos(0), 18
+Locate 3, 1: Print String$(39, "x");
+Print Chr$(9) + Chr$(9) + Chr$(9) + Chr$(9) + "ESC";
+UT.AssertEquals Csrlin, 3
+UT.AssertEquals Pos(0), 68
+Locate 4, 74: Print "a" + Chr$(9) + "b";
+UT.AssertEquals Csrlin, 5
+UT.AssertEquals Pos(0), 2
+Locate 7, 1: Print String$(30, "x");
+Locate 7, 1: Print "ab" + Chr$(9) + "c";
+UT.AssertEquals Pos(0), 10
+' columns 3 to 7; QBJS's font can reach one pixel into the cell before a character
+tabInk = 0
+For tabY = 96 To 111
+    For tabX = 16 To 55
+        If Point(tabX, tabY) <> Point(639, 479) Then tabInk = tabInk + 1
+    Next tabX
+Next tabY
+UT.AssertEquals tabInk, 0
+Cls
 
 ' GET (x1, y1)-(x2, y2), array saves a rectangle; PUT (x, y), array, action draws it back
 Dim saved(2000) As Integer
