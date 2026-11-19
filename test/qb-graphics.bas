@@ -11,6 +11,22 @@ Circle (100, 100), 50, c
 UT.AssertEquals _Alpha(c), 100
 UT.AssertEquals _Alpha32(c), 100
 
+' LOCATE rounds a row or column that is not a whole number, a half to the even number. QB64pe gives
+' the same results.
+Locate 5, 20.5
+UT.AssertEquals Pos(0), 20
+Locate 5, 21.5
+UT.AssertEquals Pos(0), 22
+Locate 5, 20.4
+UT.AssertEquals Pos(0), 20
+Locate 5, 20.6
+UT.AssertEquals Pos(0), 21
+Locate 6.5, 3
+UT.AssertEquals Csrlin, 6
+Locate 7.5, 3
+UT.AssertEquals Csrlin, 8
+Locate 1, 1
+
 ' VIEW sets a graphics view port; CLS 1 and CLS clear only that; VIEW alone ends it
 Screen 12
 Dim red As Unsigned Long
