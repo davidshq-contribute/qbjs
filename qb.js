@@ -2928,8 +2928,9 @@ var QB = new function() {
 
     this.sub_Locate = function(row, col) {
         // TODO: implement cursor positioning/display parameters
-        if (row == undefined) { row = _locY + 1; } else { row = _assertNumber(row); row = parseInt(row); }
-        if (col == undefined) { col = _locX + 1; } else { col = _assertNumber(col); col = parseInt(col); }
+        // as in QB64, a row or column that is not a whole number is rounded, a half to the even number
+        if (row == undefined) { row = _locY + 1; } else { row = _assertNumber(row); row = QB.func_Cint(row); }
+        if (col == undefined) { col = _locX + 1; } else { col = _assertNumber(col); col = QB.func_Cint(col); }
         if (row && row > 0 && row <= _textRows()) {
             _locY = row-1;
         }
