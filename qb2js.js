@@ -955,7 +955,7 @@ var OBJ = await __qblib_lib_lang_object_bas();
 var JSArray = await __qblib_lib_lang_array_bas();
 var String = await __qblib_lib_lang_string_bas();
 /* global constants: */ const FILE  =    1; const   TEXT  =    2; const MWARNING  =    0; const   MERROR  =    1; const False  =    0; const True  =   ~ False; const LF  =   (QB.func_Chr(  10)); const CR  =   (QB.func_Chr(  13)); const CRLF  =    CR +  LF; const PrintDataTypes  =    True; const PrintLineMapping  =    False; const PrintTokenizedLine  =    False; 
-/* shared variables: */ var moduleMap = QB.initArray([0], {name:'',path:'',source:'',exportMethods:{},exportConsts:{},imports:{},processed:0}); var modules = QB.initArray([0], {name:'',path:'',source:'',exportMethods:{},exportConsts:{},imports:{},processed:0}); var lines = QB.initArray([0], {line:0,text:'',mtype:0,moduleId:0,module:0}); var jsLines = QB.initArray([0], {line:0,text:'',mtype:0,moduleId:0,module:0}); var methods = QB.initArray([0], {line:0,lastLine:0,type:'',returnType:'',name:'',uname:'',argc:0,args:'',jsname:'',sync:0,builtin:0,dynamic:0}); var localMethods = QB.initArray([0], {line:0,lastLine:0,type:'',returnType:'',name:'',uname:'',argc:0,args:'',jsname:'',sync:0,builtin:0,dynamic:0}); var types = QB.initArray([0], {line:0,name:'',argc:0,args:''}); var typeVars = QB.initArray([0], {type:'',name:'',jsname:'',isConst:0,isArray:0,arraySize:0,typeId:0}); var globalVars = QB.initArray([0], {type:'',name:'',jsname:'',isConst:0,isArray:0,arraySize:0,typeId:0}); var localVars = QB.initArray([0], {type:'',name:'',jsname:'',isConst:0,isArray:0,arraySize:0,typeId:0}); var warnings = QB.initArray([0], {line:0,text:'',mtype:0,moduleId:0,module:0}); var importLines = QB.initArray([0], ''); var exportLines = QB.initArray([0], ''); var exportConsts = QB.initArray([0], {type:'',name:'',jsname:'',isConst:0,isArray:0,arraySize:0,typeId:0}); var exportMethods = QB.initArray([0], {line:0,lastLine:0,type:'',returnType:'',name:'',uname:'',argc:0,args:'',jsname:'',sync:0,builtin:0,dynamic:0}); var dataArray = QB.initArray([0], ''); var dataLabels = QB.initArray([0], {text:'',index:0}); var includeOnceMap = QB.initArray([0], 0); var jsReservedWords = QB.initArray([0], ''); var modLevel = 0; var currentMethod = ''; var activeModule = {name:'',path:'',source:'',exportMethods:{},exportConsts:{},imports:{},processed:0}; var currentModule = ''; var currentModuleId = 0; var programMethods = 0; var constVarLine = 0; var sharedVarLine = 0; var staticVarLine = 0; var implicitVarLine = 0; var condWords = QB.initArray([0], ''); var forceSelfConvert = 0; var optionRoundHalfEven = 0; var optionQBLines = 0; var optionByRef = 0; var byRefMeta = 0; var optionQBBooleans = 0; var booleansMeta = 0; var byRefPre = ''; var byRefPost = ''; var optionExplicit = 0; var optionExplicitArray = 0; var defLine = QB.initArray([0], 0); var defFirst = QB.initArray([0], 0); var defLast = QB.initArray([0], 0); var defType = QB.initArray([0], ''); var defCurLine = 0; 
+/* shared variables: */ var moduleMap = QB.initArray([0], {name:'',path:'',source:'',exportMethods:{},exportConsts:{},imports:{},processed:0}); var modules = QB.initArray([0], {name:'',path:'',source:'',exportMethods:{},exportConsts:{},imports:{},processed:0}); var lines = QB.initArray([0], {line:0,text:'',mtype:0,moduleId:0,module:0}); var jsLines = QB.initArray([0], {line:0,text:'',mtype:0,moduleId:0,module:0}); var methods = QB.initArray([0], {line:0,lastLine:0,type:'',returnType:'',name:'',uname:'',argc:0,args:'',jsname:'',sync:0,builtin:0,dynamic:0}); var localMethods = QB.initArray([0], {line:0,lastLine:0,type:'',returnType:'',name:'',uname:'',argc:0,args:'',jsname:'',sync:0,builtin:0,dynamic:0}); var types = QB.initArray([0], {line:0,name:'',argc:0,args:''}); var typeVars = QB.initArray([0], {type:'',name:'',jsname:'',isConst:0,isArray:0,arraySize:0,typeId:0}); var globalVars = QB.initArray([0], {type:'',name:'',jsname:'',isConst:0,isArray:0,arraySize:0,typeId:0}); var localVars = QB.initArray([0], {type:'',name:'',jsname:'',isConst:0,isArray:0,arraySize:0,typeId:0}); var warnings = QB.initArray([0], {line:0,text:'',mtype:0,moduleId:0,module:0}); var importLines = QB.initArray([0], ''); var exportLines = QB.initArray([0], ''); var exportConsts = QB.initArray([0], {type:'',name:'',jsname:'',isConst:0,isArray:0,arraySize:0,typeId:0}); var exportMethods = QB.initArray([0], {line:0,lastLine:0,type:'',returnType:'',name:'',uname:'',argc:0,args:'',jsname:'',sync:0,builtin:0,dynamic:0}); var dataArray = QB.initArray([0], ''); var dataLabels = QB.initArray([0], {text:'',index:0}); var includeOnceMap = QB.initArray([0], 0); var jsReservedWords = QB.initArray([0], ''); var modLevel = 0; var currentMethod = ''; var activeModule = {name:'',path:'',source:'',exportMethods:{},exportConsts:{},imports:{},processed:0}; var currentModule = ''; var currentModuleId = 0; var programMethods = 0; var constVarLine = 0; var sharedVarLine = 0; var staticVarLine = 0; var implicitVarLine = 0; var condWords = QB.initArray([0], ''); var forceSelfConvert = 0; var optionRoundHalfEven = 0; var optionQBLines = 0; var optionByRef = 0; var byRefMeta = 0; var optionQBBooleans = 0; var booleansMeta = 0; var byRefPre = ''; var byRefPost = ''; var optionQBSound = 0; var optionExplicit = 0; var optionExplicitArray = 0; var defLine = QB.initArray([0], 0); var defFirst = QB.initArray([0], 0); var defLast = QB.initArray([0], 0); var defType = QB.initArray([0], ''); var defCurLine = 0; 
 /* static method variables: */ 
 async function main() {
 
@@ -999,6 +999,7 @@ async function main() {
    booleansMeta = 0;  /* INTEGER */ 
    byRefPre = '';  /* STRING */ 
    byRefPost = '';  /* STRING */ 
+   optionQBSound = 0;  /* INTEGER */ 
    optionExplicit = 0;  /* INTEGER */ 
    optionExplicitArray = 0;  /* INTEGER */ 
    QB.resizeArray(defLine, [{l:0,u: 0}], 0, false);  /* INTEGER */ 
@@ -1122,6 +1123,9 @@ if (QB.halted()) { return; };
    if (~ selfConvert &  moduleName ==  ""  &  optionQBBooleans) {
       await sub_AddJSLine(  0,   "QB.setQBBooleans(true);");
    }
+   if (~ selfConvert &  moduleName ==  ""  &  optionQBSound) {
+      await sub_AddJSLine(  0,   "QB.setQBSound(true);");
+   }
    if (~ selfConvert &  moduleName ==  "" ) {
       var mtest = {line:0,lastLine:0,type:'',returnType:'',name:'',uname:'',argc:0,args:'',jsname:'',sync:0,builtin:0,dynamic:0};  /* METHOD */ 
       if ((await func_FindMethod( "GXOnGameEvent" ,    mtest,   "SUB" ,    True)) ) {
@@ -1235,6 +1239,7 @@ if (QB.halted()) { return; };
       await sub_AddJSLine(  0,   "function setByRef() { sub_SetByRef(); }");
       await sub_AddJSLine(  0,   "function setQBBooleans() { sub_SetQBBooleans(); }");
       await sub_AddJSLine(  0,   "function setQBLines() { sub_SetQBLines(); }");
+      await sub_AddJSLine(  0,   "function setQBSound() { sub_SetQBSound(); }");
       await sub_AddJSLine(  0,   "");
       await sub_AddJSLine(  0,   "return {");
       await sub_AddJSLine(  0,   "   compile: compile,");
@@ -1249,6 +1254,7 @@ if (QB.halted()) { return; };
       await sub_AddJSLine(  0,   "   setByRef: setByRef,");
       await sub_AddJSLine(  0,   "   setQBBooleans: setQBBooleans,");
       await sub_AddJSLine(  0,   "   setQBLines: setQBLines,");
+      await sub_AddJSLine(  0,   "   setQBSound: setQBSound,");
       await sub_AddJSLine(  0,   "};");
       await sub_AddJSLine(  0,   "}");
       await sub_AddJSLine(  0,   "if (typeof module != 'undefined') { module.exports.QBCompiler = _QBCompiler; }");
@@ -1294,6 +1300,11 @@ var QBBooleansEnabled = null;
 /* implicit variables: */ 
    QBBooleansEnabled =  optionQBBooleans |  booleansMeta;
 return QBBooleansEnabled;
+}
+async function sub_SetQBSound() {
+if (QB.halted()) { return; }; 
+/* implicit variables: */ 
+   optionQBSound = QB.roundInt(  True );
 }
 async function sub_InitTypes() {
 if (QB.halted()) { return; }; 
@@ -1730,6 +1741,18 @@ if (QB.halted()) { return; }; firstLine = QB.roundInt(firstLine); lastLine = QB.
                js = "QB.setRoundHalfEven(false);";
             } else {
                await sub_AddWarning(  i,   "Expected $ROUNDING EVEN or $ROUNDING UP");
+            }
+         } else if ( first ==  "$SOUND" ) {
+            sfix = "";
+            if ((QB.func_UBound(  parts))  > 1) {
+               sfix = (QB.func_UCase( QB.arrayValue(parts, [ 2]).value));
+            }
+            if ( sfix ==  "QB" ) {
+               js = "QB.setQBSound(true);";
+            } else if ( sfix ==  "QBJS" ) {
+               js = "QB.setQBSound(false);";
+            } else {
+               await sub_AddWarning(  i,   "Expected $SOUND QB or $SOUND QBJS");
             }
          } else if ( first ==  "$IF" ) {
             if ((QB.func_UBound(  parts))  > 1) {
@@ -6646,6 +6669,7 @@ function setRoundHalfEven() { sub_SetRoundHalfEven(); }
 function setByRef() { sub_SetByRef(); }
 function setQBBooleans() { sub_SetQBBooleans(); }
 function setQBLines() { sub_SetQBLines(); }
+function setQBSound() { sub_SetQBSound(); }
 
 return {
    compile: compile,
@@ -6660,6 +6684,7 @@ return {
    setByRef: setByRef,
    setQBBooleans: setQBBooleans,
    setQBLines: setQBLines,
+   setQBSound: setQBSound,
 };
 }
 if (typeof module != 'undefined') { module.exports.QBCompiler = _QBCompiler; }

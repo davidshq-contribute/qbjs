@@ -134,6 +134,7 @@ Dim Shared As Integer optionQBBooleans
 Dim Shared As Integer booleansMeta
 Dim Shared As String byRefPre
 Dim Shared As String byRefPost
+Dim Shared As Integer optionQBSound
 Dim Shared As Integer optionExplicit
 Dim Shared As Integer optionExplicitArray
 ' DEFINT and the other DEF statements. Entry i covers the letters defFirst(i) to defLast(i) (1 to 26)
@@ -265,6 +266,7 @@ Sub Compile (source As String, moduleName As String, selfConvert)
     If Not selfConvert And moduleName = "" And optionRoundHalfEven Then AddJSLine 0, "QB.setRoundHalfEven(true);"
     If Not selfConvert And moduleName = "" And optionQBLines Then AddJSLine 0, "QB.setQBLines(true);"
     If Not selfConvert And moduleName = "" And optionQBBooleans Then AddJSLine 0, "QB.setQBBooleans(true);"
+    If Not selfConvert And moduleName = "" And optionQBSound Then AddJSLine 0, "QB.setQBSound(true);"
 
     If Not selfConvert And moduleName = "" Then
         Dim mtest As Method
@@ -379,6 +381,7 @@ Sub Compile (source As String, moduleName As String, selfConvert)
         AddJSLine 0, "function setByRef() { sub_SetByRef(); }"
         AddJSLine 0, "function setQBBooleans() { sub_SetQBBooleans(); }"
         AddJSLine 0, "function setQBLines() { sub_SetQBLines(); }"
+        AddJSLine 0, "function setQBSound() { sub_SetQBSound(); }"
         AddJSLine 0, ""
         AddJSLine 0, "return {"
         AddJSLine 0, "   compile: compile,"
@@ -393,6 +396,7 @@ Sub Compile (source As String, moduleName As String, selfConvert)
         AddJSLine 0, "   setByRef: setByRef,"
         AddJSLine 0, "   setQBBooleans: setQBBooleans,"
         AddJSLine 0, "   setQBLines: setQBLines,"
+        AddJSLine 0, "   setQBSound: setQBSound,"
         AddJSLine 0, "};"
         AddJSLine 0, "}"
         AddJSLine 0, "if (typeof module != 'undefined') { module.exports.QBCompiler = _QBCompiler; }"
@@ -443,6 +447,14 @@ End Sub
 Function QBBooleansEnabled
     QBBooleansEnabled = optionQBBooleans Or booleansMeta
 End Function
+
+' The compiler option for sound as QB64 makes it: every dot after a PLAY note counts, there are 18.2
+' clock ticks to a second, SOUND and BEEP are as loud as PLAY, PLAY and SOUND play one after another
+' in one queue, and MB plays in the background. The $SOUND QB metacommand does the same from inside a
+' program.
+Sub SetQBSound ()
+    optionQBSound = True
+End Sub
 
 Sub InitTypes
     Dim As Integer i, j, jsidx
@@ -895,6 +907,19 @@ Sub ConvertLines (firstLine As Integer, lastLine As Integer, functionName As Str
                     js = "QB.setRoundHalfEven(false);"
                 Else
                     AddWarning i, "Expected $ROUNDING EVEN or $ROUNDING UP"
+                End If
+
+            ElseIf first = "$SOUND" Then
+                ' $SOUND QB makes sound as QB64 does; $SOUND QBJS (the default) as QBJS always has. QB64pe
+                ' does not know it, so a program that also builds there puts it inside $IF WEB THEN.
+                sfix = ""
+                If UBound(parts) > 1 Then sfix = UCase$(parts(2))
+                If sfix = "QB" Then
+                    js = "QB.setQBSound(true);"
+                ElseIf sfix = "QBJS" Then
+                    js = "QB.setQBSound(false);"
+                Else
+                    AddWarning i, "Expected $SOUND QB or $SOUND QBJS"
                 End If
 
             ElseIf first = "$IF" Then

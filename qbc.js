@@ -25,6 +25,9 @@ async function compile(src) {
         if (process.argv.includes("--qb-lines")) {
             qbc.setQBLines();
         }
+        if (process.argv.includes("--qb-sound")) {
+            qbc.setQBSound();
+        }
         result = "async function __qbjs_run() {\n" + await qbc.compile(data) + "\n}";
     }
     fs.writeFileSync(process.argv[3], result, "utf8");
