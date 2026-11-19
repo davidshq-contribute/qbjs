@@ -60,13 +60,13 @@ var QB = new function() {
 
         async play(commandString) {
             commandString = commandString.replace(/ /g, "");
-            const reg = /(?<octave>O\d+)|(?<octaveUp>>)|(?<octaveDown><)|(?<note>[A-G][#+-]?\d*\.?[,]?)|(?<noteN>N\d+\.?)|(?<length>L\d+)|(?<legato>ML)|(?<normal>MN)|(?<staccato>MS)|(?<pause>P\d+\.?)|(?<tempo>T\d+)|(?<foreground>MF)|(?<background>MB)/gi;
+            const reg = /(?<octave>O\d+)|(?<octaveUp>>)|(?<octaveDown><)|(?<note>[A-G][#+-]?\d*\.*[,]?)|(?<noteN>N\d+\.*)|(?<length>L\d+)|(?<legato>ML)|(?<normal>MN)|(?<staccato>MS)|(?<pause>P\d+\.*)|(?<tempo>T\d+)|(?<foreground>MF)|(?<background>MB)/gi;
             let match = reg.exec(commandString);
             let promise = Promise.resolve();
             let nowait = false;
             while (match) {
                 let noteValue = null;
-                let longerNote = false;
+                let dots = 0;
                 let temporaryLength = 0;
                 if (match.groups.octave) {
                     this.octave = parseInt(match[0].substring(1));
@@ -78,10 +78,8 @@ var QB = new function() {
                     this.octave--;
                 }
                 if (match.groups.note) {
-                    const noteMatch = /(?<note>[A-G])(?<suffix>[#+-]?)(?<shorthand>\d*)(?<longerNote>\.?)(?<nowait>,?)/i.exec(match[0]);
-                    if (noteMatch.groups.longerNote) {
-                        longerNote = true;
-                    }
+                    const noteMatch = /(?<note>[A-G])(?<suffix>[#+-]?)(?<shorthand>\d*)(?<dots>\.*)(?<nowait>,?)/i.exec(match[0]);
+                    dots = noteMatch.groups.dots.length;
                     if (noteMatch.groups.shorthand) {
                         temporaryLength = parseInt(noteMatch.groups.shorthand);
                     }
@@ -100,10 +98,8 @@ var QB = new function() {
                     }
                 }
                 if (match.groups.noteN) {
-                    const noteNMatch = /N(?<noteValue>\d+)(?<longerNote>\.?)/i.exec(match[0]);
-                    if (noteNMatch.groups.longerNote) {
-                        longerNote = true;
-                    }
+                    const noteNMatch = /N(?<noteValue>\d+)(?<dots>\.*)/i.exec(match[0]);
+                    dots = noteNMatch.groups.dots.length;
                     noteValue = parseInt(noteNMatch.groups.noteValue);
                 }
                 if (match.groups.length) {
@@ -119,10 +115,8 @@ var QB = new function() {
                     this.mode = 3 / 4;
                 }
                 if (match.groups.pause) {
-                    const pauseMatch = /P(?<length>\d+)(?<longerNote>\.?)/i.exec(match[0]);
-                    if (pauseMatch.groups.longerNote) {
-                        longerNote = true;
-                    }
+                    const pauseMatch = /P(?<length>\d+)(?<dots>\.*)/i.exec(match[0]);
+                    dots = pauseMatch.groups.dots.length;
                     noteValue = 0;
                     temporaryLength = parseInt(pauseMatch.groups.length);
                 }
@@ -141,7 +135,9 @@ var QB = new function() {
                     let duration = (temporaryLength
                         ? noteDuration / temporaryLength
                         : noteDuration / this.noteLength);
-                    if (longerNote) { duration *= 1.5; }
+                    // With setQBSound(true), as in QB64, each dot adds half of what the one before it
+                    // added: 1.5, 1.75, ... Otherwise any number of dots makes 1.5, as QBJS always has.
+                    if (dots) { duration *= _qbSound ? 2 - Math.pow(0.5, dots) : 1.5; }
                     const C6 = 1047;
                     const freq = noteValue == 0
                         ? 0
@@ -236,6 +232,15 @@ var QB = new function() {
     var _ccharMap = {};
     var _player = null;
     var _soundCtx = null;
+    // QBJS's sound differs from QB64's in small ways that programs written for QBJS may rely on.
+    // setQBSound(true), which $SOUND QB or the compiler option --qb-sound turns on, makes it as QB64's:
+    // every dot after a PLAY note counts, there are 18.2 clock ticks to a second, and SOUND and BEEP
+    // are as loud as PLAY. It is off by default.
+    var _qbSound = false;
+
+    this.setQBSound = function(on) {
+        _qbSound = !!on;
+    };
     var _controlChr = -1;
     var _physicalKeyboard = window.matchMedia("(pointer: fine) and (hover: hover)").matches;
     
@@ -360,6 +365,7 @@ var QB = new function() {
         _strokeLineThickness = 2;
         _player = new QBasicSound();
         _soundCtx = new AudioContext();
+        _qbSound = false;
         _controlChr = -1;
         // initialize the default fonts
         _nextFontId = 1000;
@@ -1576,7 +1582,11 @@ var QB = new function() {
         var oscillator = _soundCtx.createOscillator();
         oscillator.type = "square";
         oscillator.frequency.value = 780;
-        oscillator.connect(_soundCtx.destination);
+        // with setQBSound(true), as loud as PLAY's notes
+        var gainNode = _soundCtx.createGain();
+        gainNode.gain.value = _qbSound ? 0.25 : 1;
+        oscillator.connect(gainNode);
+        gainNode.connect(_soundCtx.destination);
         // the beep ends on the audio clock, so a busy page cannot make it longer
         var t = _soundCtx.currentTime;
         oscillator.start(t);
@@ -3937,10 +3947,12 @@ var QB = new function() {
         freq = _assertNumber(freq, 1);
         duration = _assertNumber(duration, 2);
         // convert duration to milliseconds
-        duration = duration * 1000 / 18;
+        // with setQBSound(true), 18.2 clock ticks to a second, as in QB64
+        duration = duration * 1000 / (_qbSound ? 18.2 : 18);
         if (shape == undefined || (typeof shape != 'string')) { shape = "square"; }
         if (decay == undefined || (typeof decay != 'number')) { decay = 0.0; }
-        if (gain  == undefined || (typeof gain != 'number')) { gain = 1.0; }
+        // with setQBSound(true), as loud as PLAY's notes by default, as SOUND and PLAY are in QB64
+        if (gain  == undefined || (typeof gain != 'number')) { gain = _qbSound ? 0.25 : 1.0; }
         if (!(freq == 0 || (freq >= 32 && freq <= 32767))) {
             throw new Error("Frequency invalid - valid: 0 (delay), 32 to 32767");
         }

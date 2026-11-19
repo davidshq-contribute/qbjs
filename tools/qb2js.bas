@@ -121,6 +121,7 @@ Dim Shared As Integer staticVarLine
 Dim Shared As Integer implicitVarLine
 Dim Shared As String condWords(4)
 Dim Shared As Integer forceSelfConvert
+Dim Shared As Integer optionQBSound
 Dim Shared As Integer optionExplicit
 Dim Shared As Integer optionExplicitArray
 
@@ -241,6 +242,7 @@ Sub Compile (source As String, moduleName As String, selfConvert)
     AddJSLine 0, "async function main() {"
 
     If Not selfConvert And moduleName = "" Then AddJSLine 0, "QB.start();"
+    If Not selfConvert And moduleName = "" And optionQBSound Then AddJSLine 0, "QB.setQBSound(true);"
 
     If Not selfConvert And moduleName = "" Then
         Dim mtest As Method
@@ -350,6 +352,7 @@ Sub Compile (source As String, moduleName As String, selfConvert)
         AddJSLine 0, "   return QB.arrayValue(modules, [id]).value;"
         AddJSLine 0, "}"
         AddJSLine 0, "function setSelfConvert() { sub_SetSelfConvert(); }"
+        AddJSLine 0, "function setQBSound() { sub_SetQBSound(); }"
         AddJSLine 0, ""
         AddJSLine 0, "return {"
         AddJSLine 0, "   compile: compile,"
@@ -360,6 +363,7 @@ Sub Compile (source As String, moduleName As String, selfConvert)
         AddJSLine 0, "   getSourceLine: getSourceLine,"
         AddJSLine 0, "   getModule: getModule,"
         AddJSLine 0, "   setSelfConvert: setSelfConvert,"
+        AddJSLine 0, "   setQBSound: setQBSound,"
         AddJSLine 0, "};"
         AddJSLine 0, "}"
         AddJSLine 0, "if (typeof module != 'undefined') { module.exports.QBCompiler = _QBCompiler; }"
@@ -371,6 +375,13 @@ End Sub
 
 Sub SetSelfConvert ()
     forceSelfConvert = True
+End Sub
+
+' The compiler option for sound as QB64 makes it: every dot after a PLAY note counts, there are 18.2
+' clock ticks to a second, and SOUND and BEEP are as loud as PLAY. The $SOUND QB metacommand does the
+' same from inside a program.
+Sub SetQBSound ()
+    optionQBSound = True
 End Sub
 
 Sub InitTypes
@@ -769,6 +780,19 @@ Sub ConvertLines (firstLine As Integer, lastLine As Integer, functionName As Str
 
             ElseIf first = "$NOPREFIX" Then
                 ' nothing to do here, keywords prefixes are optional
+
+            ElseIf first = "$SOUND" Then
+                ' $SOUND QB makes sound as QB64 does; $SOUND QBJS (the default) as QBJS always has. QB64pe
+                ' does not know it, so a program that also builds there puts it inside $IF WEB THEN.
+                sfix = ""
+                If UBound(parts) > 1 Then sfix = UCase$(parts(2))
+                If sfix = "QB" Then
+                    js = "QB.setQBSound(true);"
+                ElseIf sfix = "QBJS" Then
+                    js = "QB.setQBSound(false);"
+                Else
+                    AddWarning i, "Expected $SOUND QB or $SOUND QBJS"
+                End If
 
             ElseIf first = "$IF" Then
                 If UBound(parts) > 1 Then
